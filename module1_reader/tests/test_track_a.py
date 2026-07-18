@@ -1,8 +1,9 @@
 """
-Track A tests — lock down the frozen feature contract and the parsing logic.
+Track A tests — lock down the feature contract, the parsing logic, and (crucially)
+that our output satisfies Track B's contract in module2_predictor/contracts.py.
 
-These are the fragile, high-value bits: a silent change to feature order or a hole
-in the validation gate would corrupt Tracks B and C without crashing. Everything
+These are the fragile, high-value bits: a silent change to the feature schema or a
+hole in the validation gate would corrupt Tracks B and C without crashing. Everything
 here is fast and deterministic — it uses the bundled fixtures, never AMRFinderPlus.
 
 Run:  pytest module1_reader/tests
@@ -12,8 +13,8 @@ import pytest
 import feature_annotator as fa
 from feature_annotator import (
     load_spec, validate_feature_row, parse_amrfinder_tsv, marker_columns,
-    target_columns, get_annotator, PrecomputedAnnotator, ContractError,
-    load_project_config, spec_project_discrepancies,
+    target_columns, quality_columns, get_annotator, PrecomputedAnnotator,
+    ContractError, load_project_config, spec_project_discrepancies,
 )
 from build_features import run_genome_reader
 
@@ -26,21 +27,22 @@ def spec():
 
 
 # --------------------------------------------------------------------------- #
-# 1. Contract shape — the tripwire for sacred rule #1 (feature order)
+# 1. Contract shape — the tripwire for a silent schema/order change
 # --------------------------------------------------------------------------- #
 def test_run_genome_reader_returns_contract_in_order(spec):
     row = run_genome_reader(genome_id="G1", backend="amrfinderplus",
                             spec=spec, tsv_override=FIXTURE_TSV)
-    model_cols = [c for c in row if c not in spec["qc_columns"]]
-    assert model_cols == spec["feature_order"], "feature columns/order drifted from the contract"
-    for qc in spec["qc_columns"]:
+    flag_cols = [c for c in row if c not in quality_columns(spec)]
+    assert flag_cols == marker_columns(spec) + target_columns(spec), \
+        "feature columns/order drifted from the contract"
+    for qc in quality_columns(spec):
         assert qc in row
 
 
 def test_flags_are_binary_ints(spec):
     row = run_genome_reader(genome_id="G1", backend="amrfinderplus",
                             spec=spec, tsv_override=FIXTURE_TSV)
-    for col in spec["feature_order"]:
+    for col in marker_columns(spec) + target_columns(spec):
         assert row[col] in (0, 1)
         assert isinstance(row[col], int)
 
@@ -50,7 +52,6 @@ def test_flags_are_binary_ints(spec):
 # --------------------------------------------------------------------------- #
 def test_parse_detects_markers_and_maps_alias(spec):
     flags = parse_amrfinder_tsv(FIXTURE_TSV, spec)
-    # direct hits in the fixture
     assert flags["blaKPC-2"] == 1
     assert flags["gyrA_S83L"] == 1
     assert flags["aac(3)-IIa"] == 1
@@ -83,30 +84,37 @@ def test_targets_default_present(spec):
 # --------------------------------------------------------------------------- #
 # 3. The validation gate — reject off-contract rows LOUDLY
 # --------------------------------------------------------------------------- #
+def _good_row(spec):
+    row = {c: 0 for c in marker_columns(spec) + target_columns(spec)}
+    qf = spec["quality_features"]
+    row[qf["completeness"]], row[qf["contamination"]], row[qf["contigs"]] = 100.0, 0.0, 0
+    return row
+
+
 def test_validation_rejects_missing_column(spec):
-    row = {c: 0 for c in spec["feature_order"]}
-    del row[spec["feature_order"][0]]           # drop a required feature
-    row["qc_complete"], row["qc_contigs"] = 1.0, 0
+    row = _good_row(spec)
+    del row[marker_columns(spec)[0]]            # drop a required feature
     with pytest.raises(ContractError):
         validate_feature_row(row, spec)
 
 
 def test_validation_rejects_non_binary_flag(spec):
-    row = {c: 0 for c in spec["feature_order"]}
-    row[spec["feature_order"][0]] = 7           # not 0/1
-    row["qc_complete"], row["qc_contigs"] = 1.0, 0
+    row = _good_row(spec)
+    row[marker_columns(spec)[0]] = 7            # not 0/1
     with pytest.raises(ContractError):
         validate_feature_row(row, spec)
 
 
 def test_validation_coerces_string_and_numeric_types(spec):
-    row = {c: "0" for c in spec["feature_order"]}
-    row[spec["feature_order"][0]] = "1"
-    row["qc_complete"], row["qc_contigs"] = "0.95", "12"
+    row = {c: "0" for c in marker_columns(spec) + target_columns(spec)}
+    first = marker_columns(spec)[0]
+    row[first] = "1"
+    qf = spec["quality_features"]
+    row[qf["completeness"]], row[qf["contamination"]], row[qf["contigs"]] = "95.0", "1.2", "12"
     out = validate_feature_row(row, spec)
-    assert out[spec["feature_order"][0]] == 1 and isinstance(out[spec["feature_order"][0]], int)
-    assert out["qc_complete"] == pytest.approx(0.95) and isinstance(out["qc_complete"], float)
-    assert out["qc_contigs"] == 12 and isinstance(out["qc_contigs"], int)
+    assert out[first] == 1 and isinstance(out[first], int)
+    assert out[qf["completeness"]] == pytest.approx(95.0) and isinstance(out[qf["completeness"]], float)
+    assert out[qf["contigs"]] == 12 and isinstance(out[qf["contigs"]], int)
 
 
 # --------------------------------------------------------------------------- #
@@ -138,11 +146,9 @@ def test_get_annotator_unknown_backend_raises(spec):
 
 
 def test_spec_falls_back_to_bundled_sample():
-    # No shared Phase-0 spec exists in this repo yet, so load_spec() must resolve
-    # to Track A's bundled sample.
     assert not fa.SHARED_SPEC_PATH.exists()
     s = load_spec()
-    assert s["species"] == "Klebsiella pneumoniae"
+    assert s["species"]["name"] == "Klebsiella pneumoniae"
     assert set(s["drugs"]) == {"meropenem", "ciprofloxacin", "gentamicin", "ceftazidime"}
 
 
@@ -157,8 +163,24 @@ def test_project_config_is_readable():
 
 
 def test_sample_spec_stays_aligned_with_project_config(spec):
-    # Tripwire: fails if our sample drifts from the team's declared species/drugs.
     project = load_project_config()
     if project is None:
         pytest.skip("data/config/project.json not present in this checkout")
     assert spec_project_discrepancies(spec, project) == []
+
+
+# --------------------------------------------------------------------------- #
+# 7. Compatibility with Track B's contract (module2_predictor/contracts.py)
+#    The real proof of alignment: our spec + output must satisfy Track B's own
+#    validators. Skips cleanly if Track B / pandas aren't importable.
+# --------------------------------------------------------------------------- #
+def test_sample_spec_passes_track_b_feature_spec_validation():
+    contracts = pytest.importorskip("module2_predictor.contracts")
+    contracts.validate_feature_spec(load_spec())  # raises if our schema is off-contract
+
+
+def test_feature_row_passes_track_b_inference_validation(spec):
+    contracts = pytest.importorskip("module2_predictor.contracts")
+    row = run_genome_reader(genome_id="G1", backend="amrfinderplus",
+                            spec=spec, tsv_override=FIXTURE_TSV)
+    contracts.validate_inference_row(row, spec)   # raises if Track B would reject the row

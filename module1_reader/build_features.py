@@ -31,7 +31,8 @@ from pathlib import Path
 from typing import Optional
 
 from feature_annotator import (
-    MODULE_DIR, get_annotator, load_spec, target_columns, ContractError,
+    MODULE_DIR, get_annotator, load_spec, marker_columns, target_columns,
+    quality_columns, ContractError,
 )
 
 
@@ -59,7 +60,7 @@ def build_features_table(genomes: list[dict], *, backend: str = "amrfinderplus",
     Build features.csv from many genomes.
 
     `genomes` is a list of {"genome_id": ..., "source": <fasta path or table id>}.
-    Writes metadata columns + feature_order + QC columns in contract order.
+    Writes genome_id + model_features + target columns + QC columns in contract order.
     """
     spec = spec or load_spec()
     annotator = get_annotator(backend, spec, **backend_kwargs)
@@ -67,7 +68,8 @@ def build_features_table(genomes: list[dict], *, backend: str = "amrfinderplus",
     # "data/manifests/features.csv" so Track B/C consume it from the shared location.
     out_path = Path(out_path) if out_path else MODULE_DIR / "out/features.csv"
 
-    header = (["genome_id"] + spec["feature_order"] + spec.get("qc_columns", []))
+    header = (["genome_id"] + marker_columns(spec)
+              + target_columns(spec) + quality_columns(spec))
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=header)
@@ -107,12 +109,14 @@ def _main() -> None:
     except ContractError as e:
         p.error(str(e))
 
-    present = [c for c in spec["feature_order"] if row.get(c) == 1]
+    present = [c for c in marker_columns(spec) if row.get(c) == 1]
     tgt_absent = [c for c in target_columns(spec) if row.get(c) == 0]
+    qf = spec["quality_features"]
     print(f"genome_id: {args.genome_id}  (backend={args.backend})")
     print(f"markers present ({len(present)}): {present}")
     print(f"targets absent/disrupted: {tgt_absent or 'none'}")
-    print(f"QC: complete={row.get('qc_complete')} contigs={row.get('qc_contigs')}")
+    print(f"QC: completeness={row.get(qf['completeness'])} "
+          f"contamination={row.get(qf['contamination'])} contigs={row.get(qf['contigs'])}")
 
 
 if __name__ == "__main__":

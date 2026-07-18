@@ -93,8 +93,9 @@ def spec_project_discrepancies(spec: dict, project: Optional[dict] = None) -> li
         return []
     issues = []
     proj_species = (project.get("species") or {}).get("name")
-    if proj_species and proj_species != spec.get("species"):
-        issues.append(f"species mismatch: spec={spec.get('species')!r} project={proj_species!r}")
+    spec_species = (spec.get("species") or {}).get("name") if isinstance(spec.get("species"), dict) else spec.get("species")
+    if proj_species and proj_species != spec_species:
+        issues.append(f"species mismatch: spec={spec_species!r} project={proj_species!r}")
     proj_drugs = set(project.get("antibiotics", []))
     spec_drugs = set(spec.get("drugs", []))
     if proj_drugs:
@@ -105,15 +106,26 @@ def spec_project_discrepancies(spec: dict, project: Optional[dict] = None) -> li
     return issues
 
 
-def target_columns(spec: dict) -> list[str]:
-    """The `target__<gene>` presence columns implied by drug_targets."""
-    genes = {g for genes in spec["drug_targets"].values() for g in genes}
-    return [f"target__{g}" for g in sorted(genes)]
-
-
 def marker_columns(spec: dict) -> list[str]:
-    """Feature-order columns that are resistance markers (not target flags)."""
-    return [c for c in spec["feature_order"] if not c.startswith("target__")]
+    """The ordered binary marker features the model consumes (spec.model_features)."""
+    return list(spec["model_features"])
+
+
+def target_columns(spec: dict) -> list[str]:
+    """The target-status columns (drug_targets values), de-duplicated in stable order."""
+    seen, cols = set(), []
+    for feats in spec["drug_targets"].values():
+        for c in feats:
+            if c not in seen:
+                seen.add(c)
+                cols.append(c)
+    return cols
+
+
+def quality_columns(spec: dict) -> list[str]:
+    """The three QC column names, ordered completeness, contamination, contigs."""
+    qf = spec["quality_features"]
+    return [qf["completeness"], qf["contamination"], qf["contigs"]]
 
 
 class ContractError(ValueError):
@@ -125,14 +137,15 @@ def validate_feature_row(row: dict, spec: dict) -> dict:
     The validation gate. Every annotator's output passes through here.
 
     Guarantees the row has exactly the contract's columns, in a form Track B can
-    consume: all feature_order + target + QC columns present, binary flags coerced
+    consume: all model_features + target + QC columns present, binary flags coerced
     to 0/1 ints, QC coerced to the right numeric types. Fails LOUDLY on anything
     missing or non-binary so a broken backend can never silently corrupt features.
     """
     out: dict = {}
     missing, nonbinary = [], []
 
-    for col in spec["feature_order"]:  # markers + target flags fed to the model
+    # model_features + target columns are all binary flags
+    for col in marker_columns(spec) + target_columns(spec):
         if col not in row:
             missing.append(col)
             continue
@@ -149,11 +162,13 @@ def validate_feature_row(row: dict, spec: dict) -> dict:
             except (TypeError, ValueError):
                 nonbinary.append((col, v))
 
-    for col in spec.get("qc_columns", []):
+    # QC columns: completeness/contamination are floats, contigs is an int
+    qf = spec["quality_features"]
+    for col in quality_columns(spec):
         if col not in row:
             missing.append(col)
             continue
-        out[col] = float(row[col]) if col == "qc_complete" else int(row[col])
+        out[col] = int(row[col]) if col == qf["contigs"] else float(row[col])
 
     if missing or nonbinary:
         parts = []
@@ -192,12 +207,14 @@ class FeatureAnnotator(ABC):
         return validate_feature_row(self.annotate(genome_id, source), self.spec)
 
     def _empty_row(self) -> dict:
-        """All markers/targets absent, QC neutral — the base every backend fills in."""
-        row = {c: 0 for c in self.spec["feature_order"]}
+        """All markers absent, targets present, QC neutral — the base each backend fills in."""
+        row = {c: 0 for c in marker_columns(self.spec)}
         for c in target_columns(self.spec):
             row[c] = 1  # targets assumed present until evidence of loss (see AMRFinderPlus backend)
-        row["qc_complete"] = 1.0
-        row["qc_contigs"] = 0
+        qf = self.spec["quality_features"]
+        row[qf["completeness"]] = 100.0   # percent; QC no-call below quality_policy.minimum_completeness
+        row[qf["contamination"]] = 0.0    # percent
+        row[qf["contigs"]] = 0
         return row
 
 
@@ -269,7 +286,8 @@ class AMRFinderPlusAnnotator(FeatureAnnotator):
         row.update(parse_amrfinder_tsv(tsv, self.spec))
         # TODO(target-presence): replace default-present targets with a real
         #   gene-presence check (e.g. BLAST each drug_targets gene vs the assembly).
-        # TODO(qc): fill qc_complete / qc_contigs from assembly stats for this genome.
+        # TODO(qc): fill qc_completeness / qc_contamination / qc_contigs from assembly
+        #   stats (CheckM for completeness+contamination; contig count from the FASTA).
         return row
 
     def _run(self, fasta_path: Path) -> Path:

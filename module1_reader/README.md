@@ -92,6 +92,11 @@ Two "bring your own" cases, both already covered:
   present (1) until a real gene-presence check (e.g. BLAST the target gene vs the
   assembly) is wired into `AMRFinderPlusAnnotator.annotate()`.
 - **`ompK36_loss`** is a derived *absence* feature, not a direct AMRFinderPlus hit.
-- **QC columns** (`qc_complete`, `qc_contigs`) need to be filled from assembly stats.
+- **QC columns** (`qc_completeness`, `qc_contamination`, `qc_contigs`) need to be
+  filled from assembly stats (CheckM for completeness/contamination; contig count
+  from the FASTA).
+- **`split_manifest.csv`** (homology-grouped `genome_id,cluster_id,split`) is a Track A
+  deliverable per `docs/TRACK_A_HANDOFF.md` and is not produced yet — needs Mash/sourmash
+  clustering.
 - **Pin the DB**: record `amrfinder -V` into `feature_spec.json`
   (`annotation_tool_version`, `database_version`) at setup and never update mid-event.

@@ -1,76 +1,57 @@
 {
-  "_comment": "SAMPLE contract — a Track-A dev stand-in ONLY, so this module runs standalone before Phase 0 delivers. This is NOT the real spec and is NOT Track A's deliverable: the real feature_spec.json is Phase 0's (the domain expert's) shared artifact and belongs at data/manifests/feature_spec.json. This sample is kept ALIGNED with data/config/project.json (species + drug panel); the module cross-checks the two at load time. Every gene/mutation/target below is a plausible K. pneumoniae placeholder for testing shape only.",
+  "_comment": "SAMPLE contract — a Track-A dev stand-in ONLY, so this module runs standalone before Phase 0 delivers the real spec. It follows the SAME schema Track B enforces (module2_predictor/contracts.py: schema_version, species, drugs, model_features, marker_evidence, drug_targets, quality_features, quality_policy, expected_label_evidence) and is validated against it in the tests. Every marker/target below is a plausible K. pneumoniae placeholder for testing shape only; the domain expert must approve real marker->drug and target definitions.",
 
-  "species": "Klebsiella pneumoniae",
+  "schema_version": 1,
+  "species": { "name": "Klebsiella pneumoniae", "taxon_id": 573 },
   "drugs": ["meropenem", "ciprofloxacin", "gentamicin", "ceftazidime"],
+  "expected_label_evidence": "Laboratory Method",
 
-  "annotation_tool": "AMRFinderPlus",
-  "annotation_tool_version": "PLACEHOLDER-pin-at-setup",
-  "database_version": "PLACEHOLDER-pin-at-setup",
-
-  "feature_order": [
-    "gyrA_S83L", "gyrA_D87N", "parC_S80I", "qnrB1", "oqxAB",
+  "model_features": [
     "blaKPC-2", "blaNDM-1", "blaOXA-48", "ompK36_loss",
+    "gyrA_S83L", "gyrA_D87N", "parC_S80I", "qnrB1", "oqxAB",
     "aac(3)-IIa", "aac(6')-Ib", "armA", "rmtB",
-    "blaCTX-M-15", "blaSHV-12",
-    "target__gyrA", "target__parC", "target__ftsI", "target__rrs"
+    "blaCTX-M-15", "blaSHV-12"
   ],
 
-  "marker_drug": {
-    "gyrA_S83L": "ciprofloxacin",
-    "gyrA_D87N": "ciprofloxacin",
-    "parC_S80I": "ciprofloxacin",
-    "qnrB1": "ciprofloxacin",
-    "oqxAB": "ciprofloxacin",
-    "blaKPC-2": "meropenem",
-    "blaNDM-1": "meropenem",
-    "blaOXA-48": "meropenem",
-    "ompK36_loss": "meropenem",
-    "aac(3)-IIa": "gentamicin",
-    "aac(6')-Ib": "gentamicin",
-    "armA": "gentamicin",
-    "rmtB": "gentamicin",
-    "blaCTX-M-15": "ceftazidime",
-    "blaSHV-12": "ceftazidime"
-  },
-
-  "marker_types": {
-    "gyrA_S83L": "point",
-    "gyrA_D87N": "point",
-    "parC_S80I": "point",
-    "qnrB1": "gene",
-    "oqxAB": "efflux",
-    "blaKPC-2": "gene",
-    "blaNDM-1": "gene",
-    "blaOXA-48": "gene",
-    "ompK36_loss": "porin",
-    "aac(3)-IIa": "gene",
-    "aac(6')-Ib": "gene",
-    "armA": "gene",
-    "rmtB": "gene",
-    "blaCTX-M-15": "gene",
-    "blaSHV-12": "gene"
+  "marker_evidence": {
+    "blaKPC-2":    { "type": "gene",   "drugs": ["meropenem"],     "source": "NCBI Reference Gene Catalog", "amrfinder_method": "EXACTX" },
+    "blaNDM-1":    { "type": "gene",   "drugs": ["meropenem"],     "source": "NCBI Reference Gene Catalog", "amrfinder_method": "EXACTX" },
+    "blaOXA-48":   { "type": "gene",   "drugs": ["meropenem"],     "source": "NCBI Reference Gene Catalog", "amrfinder_method": "BLASTX" },
+    "ompK36_loss": { "type": "porin",  "drugs": ["meropenem"],     "source": "derived: porin absence/truncation", "amrfinder_method": "DERIVED" },
+    "gyrA_S83L":   { "type": "point",  "drugs": ["ciprofloxacin"], "source": "NCBI Reference Gene Catalog", "amrfinder_method": "POINTX" },
+    "gyrA_D87N":   { "type": "point",  "drugs": ["ciprofloxacin"], "source": "NCBI Reference Gene Catalog", "amrfinder_method": "POINTX" },
+    "parC_S80I":   { "type": "point",  "drugs": ["ciprofloxacin"], "source": "NCBI Reference Gene Catalog", "amrfinder_method": "POINTX" },
+    "qnrB1":       { "type": "gene",   "drugs": ["ciprofloxacin"], "source": "NCBI Reference Gene Catalog", "amrfinder_method": "EXACTX" },
+    "oqxAB":       { "type": "efflux", "drugs": ["ciprofloxacin"], "source": "NCBI Reference Gene Catalog", "amrfinder_method": "BLASTX" },
+    "aac(3)-IIa":  { "type": "gene",   "drugs": ["gentamicin"],    "source": "NCBI Reference Gene Catalog", "amrfinder_method": "EXACTX" },
+    "aac(6')-Ib":  { "type": "gene",   "drugs": ["gentamicin"],    "source": "NCBI Reference Gene Catalog", "amrfinder_method": "EXACTX" },
+    "armA":        { "type": "gene",   "drugs": ["gentamicin"],    "source": "NCBI Reference Gene Catalog", "amrfinder_method": "EXACTX" },
+    "rmtB":        { "type": "gene",   "drugs": ["gentamicin"],    "source": "NCBI Reference Gene Catalog", "amrfinder_method": "EXACTX" },
+    "blaCTX-M-15": { "type": "gene",   "drugs": ["ceftazidime"],   "source": "NCBI Reference Gene Catalog", "amrfinder_method": "EXACTX" },
+    "blaSHV-12":   { "type": "gene",   "drugs": ["ceftazidime"],   "source": "NCBI Reference Gene Catalog", "amrfinder_method": "EXACTX" }
   },
 
   "drug_targets": {
-    "meropenem": ["ftsI"],
-    "ciprofloxacin": ["gyrA", "parC"],
-    "gentamicin": ["rrs"],
-    "ceftazidime": ["ftsI"]
+    "meropenem":     ["target__ftsI"],
+    "ciprofloxacin": ["target__gyrA", "target__parC"],
+    "gentamicin":    ["target__rrs"],
+    "ceftazidime":   ["target__ftsI"]
+  },
+
+  "quality_features": {
+    "completeness": "qc_completeness",
+    "contamination": "qc_contamination",
+    "contigs": "qc_contigs"
+  },
+  "quality_policy": {
+    "minimum_completeness": 90.0,
+    "maximum_contamination": 5.0,
+    "maximum_contigs": 500
   },
 
   "marker_aliases": {
     "OqxA": "oqxAB",
     "OqxB": "oqxAB",
     "aac(3)-IId": "aac(3)-IIa"
-  },
-
-  "qc_columns": ["qc_complete", "qc_contigs"],
-  "metadata_columns": ["genome_id", "cluster_id", "split"],
-
-  "column_dtypes": {
-    "marker_and_target": "int8",
-    "qc_complete": "float32",
-    "qc_contigs": "int32"
   }
 }
