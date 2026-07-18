@@ -1,1 +1,25 @@
+# Local environments and Python output
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Generated data and model artifacts
+data/raw/
+data/genomes/
+data/generated/
+models/*.joblib
+models/*.pkl
+eval/*.csv
+eval/*.png
+
+# Local secrets and editor files
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+
+# Team planning documents may be copied here locally but are not source code.
 TEAM_OWNERSHIP.md
