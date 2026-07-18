@@ -1,10 +1,11 @@
 # Genome Firewall: Team Status and Next Steps
 
-**Status snapshot:** 18 July 2026 (Reykjavik)
+**Status snapshot:** 19 July 2026 (Track C app/eval UI update)
 
 **Repository:** https://github.com/liiandy/Hach-Nation-Hackathon---Genome-Firewall
 
-**Current main commit:** `c4b9aa4`
+**Current main commit:** `ffcb0de` (plus pending Track C UI changes on the
+working branch — see §4)
 
 ## Executive summary
 
@@ -139,18 +140,58 @@ python -m module2_predictor.evaluate
 It contains synthetic markers and labels. Its metrics are software test results,
 not biological evidence.
 
-### 4. Track C compatibility
+### 4. Track C — decision report app and interactive evaluation UI
 
-The Streamlit app and Track C evaluation entry point now consume the current
-Track B bundle and record schema. The app visibly labels synthetic mode and
-retains the mandatory laboratory-confirmation warning.
+The Streamlit app and Track C evaluation entry point consume the current Track B
+bundle and record schema. The report has been rebuilt into a professional,
+demo-ready interface:
+
+- **Professional clinical-blue theme** (`.streamlit/config.toml`, adapted from the
+  healthcare theme in `github.com/jmedia65/awesome-streamlit-themes`): IBM Plex
+  fonts, medical-blue palette, hairline borders — one cohesive design system.
+- **Decision cards with graded evidence.** Each drug shows a coloured verdict
+  badge, a calibrated-confidence bar, and a distinct evidence-tier pill:
+  known-marker (green, strongest), statistical-only (amber, "not proof of
+  mechanism"), or no-signal (grey). No-call cards are visually separated and list
+  every abstention reason in plain language (target absent, low QC, out-of-
+  distribution, marker/model conflict, low confidence).
+- **Prominent synthetic-mode disclosure ribbon.** The app states openly that it
+  runs on the synthetic fixture and that only the genomes are stand-ins — the
+  calibration, gating, no-call logic, grouped split, and metrics are real. Honest
+  disclosure is treated as submission value, not something to hide. The mandatory
+  laboratory-confirmation banner is retained at the top.
+- **Interactive evaluation, in-app.** A per-antibiotic performance chart (AUROC,
+  balanced accuracy, recall R/S) and per-drug calibration reliability curves are
+  rendered as interactive Plotly charts with hover tooltips, plus a held-out
+  metrics table. Colours use a validated monochrome-blue ramp (checked with the
+  data-viz validator: single hue, monotone lightness, sufficient contrast).
+- **FASTA-upload path wired for Track A.** An "Upload a genome (FASTA)" tab and a
+  `build_feature_row_from_fasta()` seam are in place; today it shows an honest
+  "integration pending" notice, and Track A's genome reader plugs straight in
+  there to make real uploads run end to end.
+- **Figures ported to the real contract.** `TrackC/make_figures.py` now reads
+  `data/synthetic/*` + the joblib bundle (was still on the old
+  `data/manifests/feature_spec.json` layout) and regenerates the static
+  `eval/fig_reliability.png` / `eval/fig_leakage.png` artifacts.
+
+Files: `TrackC/app.py`, `TrackC/charts.py` (new), `TrackC/make_figures.py`,
+`.streamlit/config.toml` (new). Runtime deps added: `streamlit`, `plotly`,
+`matplotlib` (Python 3.11).
+
+Run it:
+
+```bash
+python -m module2_predictor.train        # produces models/synthetic_bundle.joblib
+python -m module2_predictor.evaluate     # produces eval/*.csv consumed by the app
+streamlit run TrackC/app.py
+```
 
 Automated status:
 
 ```text
 12 tests passed
 Synthetic generate -> train -> predict -> evaluate passed
-Streamlit application test executed without exceptions
+Streamlit application test (AppTest) executed without exceptions
 ```
 
 ## What is not complete
@@ -162,7 +203,9 @@ Streamlit application test executed without exceptions
 5. Mash/Sourmash homology clusters and grouped splits do not exist yet.
 6. Track B has not been trained on real biological features.
 7. There are no real held-out performance or calibration results.
-8. The app does not yet process a real uploaded FASTA through Track A.
+8. The app does not yet process a real uploaded FASTA through Track A. The
+   upload UI and the `build_feature_row_from_fasta()` seam are ready; they are
+   waiting on Track A's genome reader to fill in.
 9. Attribution, final model card, demo narrative, and final scientific review
    remain incomplete.
 

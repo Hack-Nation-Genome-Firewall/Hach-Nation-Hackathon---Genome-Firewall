@@ -1,0 +1,18 @@
+# Genome Firewall — professional clinical-blue theme.
+# Palette adapted from the "healthcare" theme in
+# github.com/jmedia65/awesome-streamlit-themes (clinical blue, medical-grade).
+[theme]
+primaryColor = "#0066cc"
+backgroundColor = "#fafbfc"
+secondaryBackgroundColor = "#f4f6f8"
+textColor = "#2c3e50"
+linkColor = "#0052a3"
+borderColor = "#dee2e6"
+showWidgetBorder = true
+baseRadius = "0.4rem"
+codeBackgroundColor = "#f1f3f4"
+showSidebarBorder = true
+
+[theme.sidebar]
+backgroundColor = "#f1f4f7"
+secondaryBackgroundColor = "#e8ecf1"
