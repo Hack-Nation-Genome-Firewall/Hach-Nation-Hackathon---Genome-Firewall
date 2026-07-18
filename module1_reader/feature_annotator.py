@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import subprocess
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -162,16 +163,16 @@ def validate_feature_row(row: dict, spec: dict) -> dict:
     """
     The validation gate. Every annotator's output passes through here.
 
-    Guarantees the row has exactly the contract's columns, in a form Track B can
-    consume: all model_features + target + QC columns present, binary flags coerced
-    to 0/1 ints, QC coerced to the right numeric types. Fails LOUDLY on anything
-    missing or non-binary so a broken backend can never silently corrupt features.
+    Guarantees the row has exactly the contract's columns in a form Track B can
+    consume. Model features must be binary. Target and QC measurements may be
+    explicitly unknown (None/blank/NaN), which Track B routes to no-call rather
+    than treating missing evidence as a pass. Invalid measured values fail loudly.
     """
     out: dict = {}
     missing, nonbinary = [], []
 
-    # model_features + target columns are all binary flags
-    for col in marker_columns(spec) + target_columns(spec):
+    # Model features are always required and binary.
+    for col in marker_columns(spec):
         if col not in row:
             missing.append(col)
             continue
@@ -188,30 +189,62 @@ def validate_feature_row(row: dict, spec: dict) -> dict:
             except (TypeError, ValueError):
                 nonbinary.append((col, v))
 
-    # QC columns: completeness/contamination are floats, contigs is an int.
-    # None means "QC unknown" — kept as None (not faked clean) so Track B routes it
-    # to no-call, per the guardrail "a missing QC value must not read as good".
+    # Target measurements are binary when known. Unknown is a valid inference
+    # state because Track B has an explicit target_status_unknown no-call gate.
+    for col in target_columns(spec):
+        if col not in row:
+            missing.append(col)
+            continue
+        v = row[col]
+        if _unknown(v):
+            out[col] = None
+        elif v in (0, 1, "0", "1", True, False):
+            out[col] = int(v)
+        else:
+            try:
+                iv = int(v)
+                if iv in (0, 1):
+                    out[col] = iv
+                else:
+                    nonbinary.append((col, v))
+            except (TypeError, ValueError):
+                nonbinary.append((col, v))
+
+    # QC measurements are numeric when known. Unknown values trigger Track B's
+    # quality_status_unknown no-call gate.
     qf = spec["quality_features"]
+    invalid_quality = []
     for col in quality_columns(spec):
         if col not in row:
             missing.append(col)
             continue
         v = row[col]
-        if v is None or v == "":
+        if _unknown(v):
             out[col] = None
-        else:
+            continue
+        try:
             out[col] = int(v) if col == qf["contigs"] else float(v)
+        except (TypeError, ValueError):
+            invalid_quality.append((col, v))
 
-    if missing or nonbinary:
+    if missing or nonbinary or invalid_quality:
         parts = []
         if missing:
             parts.append(f"missing columns: {missing}")
         if nonbinary:
             parts.append(f"non-binary flag values: {nonbinary}")
+        if invalid_quality:
+            parts.append(f"non-numeric QC values: {invalid_quality}")
         raise ContractError(
             "Feature row does not match feature_spec.json — " + "; ".join(parts)
         )
     return out
+
+
+def _unknown(value) -> bool:
+    return value is None or value == "" or (
+        isinstance(value, float) and math.isnan(value)
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -245,14 +278,14 @@ class FeatureAnnotator(ABC):
         return validate_feature_row(self.annotate(genome_id, source), self.spec)
 
     def _empty_row(self) -> dict:
-        """All markers absent, targets present, QC unknown — the base each backend fills in."""
+        """All markers absent, target/QC evidence unknown: the base each backend fills in."""
         row = {c: 0 for c in marker_columns(self.spec)}
         for c in target_columns(self.spec):
-            row[c] = 1  # targets assumed present until evidence of loss (see AMRFinderPlus backend)
-        # QC unknown until _fill_qc supplies it — NOT faked clean (guardrail: a
-        # missing QC value must read as no-call, never as a good assembly).
-        for c in quality_columns(self.spec):
             row[c] = None
+        qf = self.spec["quality_features"]
+        row[qf["completeness"]] = None
+        row[qf["contamination"]] = None
+        row[qf["contigs"]] = None
         return row
 
     def _fill_qc(self, row: dict, genome_id: str) -> None:
@@ -330,7 +363,8 @@ class AMRFinderPlusAnnotator(FeatureAnnotator):
     NOTE (honest limitation): AMRFinderPlus reports resistance markers, not the
     presence/intactness of a drug's *target* housekeeping gene. Target-presence
     detection (the `target__<gene>` flags) needs a separate gene-presence check
-    against the assembly; until that is wired in, targets default to present (1).
+    against the assembly; until that is wired in, targets remain unknown and Track
+    B returns no-call.
     ompK36_loss is likewise a derived "absence" feature, not a direct AMRFinderPlus
     hit. Both are flagged TODO below rather than faked. Markers AMRFinderPlus reports
     that are outside the vocabulary are recorded in `last_unknown_markers`, not dropped.
@@ -359,7 +393,7 @@ class AMRFinderPlusAnnotator(FeatureAnnotator):
         row.update(flags)
         self.last_unknown_markers = unknown   # preserved for review, not dropped
         self._fill_qc(row, genome_id)         # real QC from qc_source, else unknown
-        # TODO(target-presence): replace default-present targets with a real
+        # TODO(target-presence): replace unknown targets with a real
         #   gene-presence check (e.g. BLAST each drug_targets gene vs the assembly).
         return row
 

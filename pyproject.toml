@@ -16,12 +16,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-app = ["matplotlib==3.10.8", "streamlit==1.45.1"]
+app = ["matplotlib==3.10.8", "plotly==6.6.0", "streamlit==1.45.1"]
 dev = ["pytest==8.3.4"]
 
 [tool.setuptools]
-packages = ["data", "module2_predictor"]
+packages = ["data", "module1_reader", "module2_predictor"]
+
+[tool.setuptools.package-data]
+module1_reader = ["fixtures/*.json", "fixtures/*.tsv"]
 
 [tool.pytest.ini_options]
-addopts = "-q"
-testpaths = ["tests"]
+addopts = "-q --basetemp=.pytest-tmp"
+testpaths = ["tests", "module1_reader/tests"]

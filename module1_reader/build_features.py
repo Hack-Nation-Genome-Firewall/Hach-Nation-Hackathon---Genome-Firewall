@@ -30,10 +30,16 @@ import csv
 from pathlib import Path
 from typing import Optional
 
-from feature_annotator import (
-    MODULE_DIR, get_annotator, load_spec, load_qc_map, marker_columns,
-    target_columns, quality_columns, ContractError,
-)
+try:
+    from .feature_annotator import (
+        MODULE_DIR, get_annotator, load_qc_map, load_spec, marker_columns,
+        target_columns, quality_columns, validate_feature_row, ContractError,
+    )
+except ImportError:  # Support `python module1_reader/build_features.py`.
+    from feature_annotator import (
+        MODULE_DIR, get_annotator, load_qc_map, load_spec, marker_columns,
+        target_columns, quality_columns, validate_feature_row, ContractError,
+    )
 
 
 def run_genome_reader(fasta: Optional[str] = None, *, genome_id: str = "query",
@@ -52,7 +58,6 @@ def run_genome_reader(fasta: Optional[str] = None, *, genome_id: str = "query",
     annotator = get_annotator(backend, spec, **backend_kwargs)
     # AMRFinderPlus backend accepts a saved TSV so we can run without the tool.
     if tsv_override is not None and backend == "amrfinderplus":
-        from feature_annotator import validate_feature_row
         raw = annotator.annotate(genome_id, fasta, tsv_override=Path(tsv_override))
         row = validate_feature_row(raw, spec)
     else:
@@ -137,10 +142,12 @@ def _main() -> None:
 
     present = [c for c in marker_columns(spec) if row.get(c) == 1]
     tgt_absent = [c for c in target_columns(spec) if row.get(c) == 0]
+    tgt_unknown = [c for c in target_columns(spec) if row.get(c) is None]
     qf = spec["quality_features"]
     print(f"genome_id: {args.genome_id}  (backend={args.backend})")
     print(f"markers present ({len(present)}): {present}")
     print(f"targets absent/disrupted: {tgt_absent or 'none'}")
+    print(f"targets unknown: {tgt_unknown or 'none'}")
     print(f"QC: completeness={row.get(qf['completeness'])} "
           f"contamination={row.get(qf['contamination'])} contigs={row.get(qf['contigs'])}")
     print(f"unknown markers (preserved, not in vocab): {unknown or 'none'}")

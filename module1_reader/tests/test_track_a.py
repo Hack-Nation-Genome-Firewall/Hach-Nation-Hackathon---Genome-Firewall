@@ -10,13 +10,13 @@ Run:  pytest module1_reader/tests
 """
 import pytest
 
-import feature_annotator as fa
-from feature_annotator import (
+from module1_reader import feature_annotator as fa
+from module1_reader.feature_annotator import (
     load_spec, validate_feature_row, parse_amrfinder_tsv, parse_amrfinder_markers,
     marker_columns, target_columns, quality_columns, get_annotator, load_qc_map,
     PrecomputedAnnotator, ContractError, load_project_config, spec_project_discrepancies,
 )
-from build_features import run_genome_reader, build_features_table
+from module1_reader.build_features import run_genome_reader, build_features_table
 
 FIXTURE_TSV = fa.MODULE_DIR / "fixtures" / "sample_amrfinder.tsv"
 
@@ -42,7 +42,7 @@ def test_run_genome_reader_returns_contract_in_order(spec):
 def test_flags_are_binary_ints(spec):
     row = run_genome_reader(genome_id="G1", backend="amrfinderplus",
                             spec=spec, tsv_override=FIXTURE_TSV)
-    for col in marker_columns(spec) + target_columns(spec):
+    for col in marker_columns(spec):
         assert row[col] in (0, 1)
         assert isinstance(row[col], int)
 
@@ -101,11 +101,13 @@ def test_batch_writes_unknown_markers_sidecar(tmp_path, spec):
     assert "G1,blaFOO-999" in text
 
 
-def test_targets_default_present(spec):
+def test_unmeasured_targets_and_qc_default_unknown(spec):
     row = run_genome_reader(genome_id="G1", backend="amrfinderplus",
                             spec=spec, tsv_override=FIXTURE_TSV)
     for col in target_columns(spec):
-        assert row[col] == 1  # present-until-proven-absent default (documented TODO)
+        assert row[col] is None
+    for col in quality_columns(spec):
+        assert row[col] is None
 
 
 # --------------------------------------------------------------------------- #
@@ -142,6 +144,15 @@ def test_validation_coerces_string_and_numeric_types(spec):
     assert out[first] == 1 and isinstance(out[first], int)
     assert out[qf["completeness"]] == pytest.approx(95.0) and isinstance(out[qf["completeness"]], float)
     assert out[qf["contigs"]] == 12 and isinstance(out[qf["contigs"]], int)
+
+
+def test_validation_preserves_explicit_unknown_gate_inputs(spec):
+    row = _good_row(spec)
+    for col in target_columns(spec) + quality_columns(spec):
+        row[col] = None
+    out = validate_feature_row(row, spec)
+    for col in target_columns(spec) + quality_columns(spec):
+        assert out[col] is None
 
 
 # --------------------------------------------------------------------------- #
@@ -221,7 +232,7 @@ def _clusters(n_clusters=5, per=4):
 
 
 def test_split_assigns_whole_clusters_and_all_splits_used():
-    from split_manifest import assign_clusters_to_splits
+    from module1_reader.split_manifest import assign_clusters_to_splits
     cluster_of = _clusters()
     genome_split, cluster_split = assign_clusters_to_splits(cluster_of, seed=20260718)
     # every genome in a cluster shares that cluster's split (no cluster crosses splits)
@@ -231,7 +242,7 @@ def test_split_assigns_whole_clusters_and_all_splits_used():
 
 
 def test_split_is_deterministic():
-    from split_manifest import assign_clusters_to_splits
+    from module1_reader.split_manifest import assign_clusters_to_splits
     cluster_of = _clusters(8, 3)
     a, _ = assign_clusters_to_splits(cluster_of, seed=20260718)
     b, _ = assign_clusters_to_splits(cluster_of, seed=20260718)
@@ -239,7 +250,7 @@ def test_split_is_deterministic():
 
 
 def test_split_too_few_clusters_raises():
-    from split_manifest import assign_clusters_to_splits
+    from module1_reader.split_manifest import assign_clusters_to_splits
     with pytest.raises(ValueError):
         assign_clusters_to_splits({"g0": "c0", "g1": "c1"})   # only 2 clusters
 
@@ -247,7 +258,7 @@ def test_split_too_few_clusters_raises():
 def test_split_manifest_satisfies_track_b_contract(tmp_path, spec):
     pd = pytest.importorskip("pandas")
     contracts = pytest.importorskip("module2_predictor.contracts")
-    from split_manifest import build_split_manifest
+    from module1_reader.split_manifest import build_split_manifest
 
     cluster_of = _clusters(6, 3)                       # 18 genomes, 6 clusters
     manifest = build_split_manifest(cluster_of, tmp_path / "split.csv",

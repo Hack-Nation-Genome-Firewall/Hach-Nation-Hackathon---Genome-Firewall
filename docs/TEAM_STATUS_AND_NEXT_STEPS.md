@@ -155,11 +155,11 @@ demo-ready interface:
   mechanism"), or no-signal (grey). No-call cards are visually separated and list
   every abstention reason in plain language (target absent, low QC, out-of-
   distribution, marker/model conflict, low confidence).
-- **Prominent synthetic-mode disclosure ribbon.** The app states openly that it
-  runs on the synthetic fixture and that only the genomes are stand-ins — the
-  calibration, gating, no-call logic, grouped split, and metrics are real. Honest
-  disclosure is treated as submission value, not something to hide. The mandatory
-  laboratory-confirmation banner is retained at the top.
+- **Prominent synthetic-mode disclosure ribbon.** The app states openly that the
+  genomes, features, labels, marker vocabulary, split groups, and resulting metrics
+  are synthetic. The training, calibration, gating, no-call, prediction, and report
+  code paths are real and reproducible, but the current metrics are software checks,
+  not biological performance. The mandatory laboratory-confirmation banner remains.
 - **Interactive evaluation, in-app.** A per-antibiotic performance chart (AUROC,
   balanced accuracy, recall R/S) and per-drug calibration reliability curves are
   rendered as interactive Plotly charts with hover tooltips, plus a held-out
@@ -173,12 +173,12 @@ demo-ready interface:
   Track A files were modified. It degrades honestly rather than faking a result: if
   AMRFinderPlus is not installed the tab says so, a tool-free checkbox demonstrates
   the wiring against Track A's bundled sample annotation (read-only), and an
-  uploaded-genome banner states plainly that the verdicts are a pipeline
-  demonstration, not biology — because the deployed bundle is still the synthetic
-  fixture, real gene names the reader finds (`blaKPC-2`, `gyrA_S83L`, …) are
-  preserved as unknown markers rather than scored. It becomes a real biological
-  result once Phase 0 publishes the shared `feature_spec.json` and Track B trains a
-  bundle on that vocabulary.
+  uploaded-genome banner states plainly that the report is a pipeline demonstration,
+  not biology. Target presence and QC measurements remain unknown, forcing no-call;
+  the deployed bundle is also synthetic, so real gene names the reader finds
+  (`blaKPC-2`, `gyrA_S83L`, …) are preserved as unknown markers rather than scored.
+  Biological results additionally require an expert-approved feature specification,
+  measured target/QC fields, and a Track B bundle trained and evaluated on real data.
 - **Figures ported to the real contract.** `TrackC/make_figures.py` now reads
   `data/synthetic/*` + the joblib bundle (was still on the old
   `data/manifests/feature_spec.json` layout) and regenerates the static
@@ -199,7 +199,7 @@ streamlit run TrackC/app.py
 Automated status:
 
 ```text
-12 tests passed
+39 tests passed (Track A, data acquisition, and Track B)
 Synthetic generate -> train -> predict -> evaluate passed
 Streamlit application test (AppTest) executed without exceptions
 ```
@@ -215,11 +215,11 @@ Streamlit application test (AppTest) executed without exceptions
 7. There are no real held-out performance or calibration results.
 8. The app is wired to Track A's genome reader (FASTA -> reader -> feature row ->
    prediction runs end to end), but a real uploaded FASTA cannot yet yield a
-   biological result: AMRFinderPlus is not installed on the demo host, and the
-   deployed bundle is still the synthetic fixture, so real markers the reader finds
-   are preserved as unknown rather than scored. Unblocked by installing
-   AMRFinderPlus plus Phase 0's shared spec and a real Track B bundle (items 2, 5,
-   6 above).
+   biological result. AMRFinderPlus is not installed on the demo host; target and QC
+   measurements remain unknown and force no-call; and the deployed bundle is still
+   synthetic, so real markers are preserved as unknown rather than scored. Unblocking
+   this requires AMRFinderPlus, measured target/QC features, the approved shared spec,
+   real homology groups, and a real Track B bundle (items 2-6 above).
 9. Attribution, final model card, demo narrative, and final scientific review
    remain incomplete.
 

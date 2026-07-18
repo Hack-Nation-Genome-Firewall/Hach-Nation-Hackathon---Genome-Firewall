@@ -4,7 +4,7 @@ GENOME FIREWALL — Module 3: The Decision Report (Streamlit).
 Run:  streamlit run TrackC/app.py
 
 Reference demo. Runs on a SYNTHETIC fixture today (disclosed prominently in the
-UI); the FASTA-upload path is wired and waiting for Track A's genome reader
+UI); the FASTA-upload path is wired to Track A's genome reader
 (AMRFinderPlus -> feature row) — see `build_feature_row_from_fasta` below.
 
 Visual theme: clinical-blue (see .streamlit/config.toml), adapted from the
@@ -125,12 +125,11 @@ if IS_SYNTHETIC:
             """
             <div class="gf-ribbon">
               <b>🧪 SYNTHETIC INTEGRATION MODE — we are disclosing this openly.</b><br>
-              This demo runs on a <b>synthetic fixture</b>, not real BV-BRC genomes. The
-              <em>machinery</em> is real and reproducible — calibration, the deterministic
-              target gate, no-call abstention, the homology-grouped split and every metric.
-              Only the genomes are stand-ins until Track A's AMRFinderPlus features and the
-              frozen BV-BRC lab labels are wired in. Showing this honestly beats pretending
-              we already have real data.
+              This demo uses synthetic genomes, features, labels, marker vocabulary,
+              split groups, and metrics. The execution code is real and reproducible:
+              training, calibration, deterministic gates, no-call abstention, prediction,
+              and reporting. Biological performance is not available until real Track A
+              features and the frozen BV-BRC laboratory labels are used for training.
             </div>
             """
         ),
@@ -168,7 +167,7 @@ with st.sidebar:
     st.info("Outside this species / antibiotic set the system returns **no-call**.")
     st.divider()
     if IS_SYNTHETIC:
-        st.warning("**Data mode: SYNTHETIC**\n\nReplace with real BV-BRC + AMRFinderPlus features to go live.")
+        st.warning("**Data mode: SYNTHETIC**\n\nNo biological performance claims. Replace with real BV-BRC labels and validated Track A features.")
     else:
         st.success("**Data mode: REAL** (BV-BRC lab-measured)")
     st.caption(f"Contract status: `{SPEC.get('status', 'unspecified')}`")
@@ -265,9 +264,7 @@ def build_feature_row_from_fasta(
     (Track A's bundled sample) so the wiring is demonstrable without the tool
     installed. Raises FileNotFoundError if AMRFinderPlus is not on PATH."""
     import tempfile
-    if str(MODULE1_DIR) not in sys.path:
-        sys.path.insert(0, str(MODULE1_DIR))  # Track A uses bare intra-module imports
-    from build_features import run_genome_reader  # Track A entry point (untouched)
+    from module1_reader.build_features import run_genome_reader
 
     unknown: list = []
     with tempfile.NamedTemporaryFile("wb", suffix=".fasta") as tmp:
@@ -296,9 +293,9 @@ with tab_demo:
 with tab_upload:
     up = st.file_uploader("Assembled genome — FASTA (.fasta / .fa / .fna)",
                           type=["fasta", "fa", "fna"])
-    st.caption("This runs the real pipeline: your genome → Track A's reader "
+    st.caption("This runs the integration path: your genome → Track A's reader "
                "(`module1_reader.run_genome_reader`) → feature row → prediction. "
-               "The report below then renders for **your** genome.")
+               "Unmeasured target and QC fields remain unknown, forcing no-call.")
     demo_wiring = st.checkbox(
         "AMRFinderPlus isn't installed here — prove the wiring with Track A's bundled "
         "sample annotation instead", value=not _amrfinder_available(),
@@ -343,7 +340,8 @@ if _uploaded and _uploaded[0] == gid:
         f"upload: **{_name}** → {_src} → feature row → prediction. The reader parsed "
         f"the genome and preserved **{len(_unknown)} marker(s)** it found"
         + (f": {_found}" if _unknown else "")
-        + ". Because the *deployed model* is still the synthetic fixture (its "
+        + ". Target presence and assembly QC remain unknown, so Track B abstains. "
+        "Because the *deployed model* is still the synthetic fixture (its "
         "vocabulary is `marker__known__*`, not real gene names), those real markers "
         "are carried as **unknown** rather than scored — so the verdicts below are a "
         "**pipeline demonstration, not a biological result**. They become meaningful "
@@ -361,8 +359,8 @@ st.markdown("".join(render_card(r) for r in recs), unsafe_allow_html=True)
 # ---------------------------------------------------------------------------
 st.divider()
 st.subheader("Held-out performance & calibration")
-st.caption("Evaluated on a **homology-grouped** test split — near-identical genomes never "
-           "span train/test, so these numbers are not inflated by leakage.")
+st.caption("Software check on a **synthetic grouped** test split. The grouping logic prevents "
+           "fixture groups from crossing train/test; these are not biological metrics.")
 
 overall_path = EVAL_DIR / "overall_metrics.csv"
 pred_path = EVAL_DIR / "held_out_predictions.csv"

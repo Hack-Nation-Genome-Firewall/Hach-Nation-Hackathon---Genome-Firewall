@@ -1,8 +1,11 @@
 # Local environments and Python output
 .venv/
+build/
+*.egg-info/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.pytest-tmp*/
 .ruff_cache/
 
 # Generated data and model artifacts
