@@ -1,10 +1,11 @@
 # Genome Firewall: Team Status and Next Steps
 
-**Status snapshot:** 18 July 2026 (Reykjavik)
+**Status snapshot:** 19 July 2026 (Track C — FASTA upload wired to Track A reader)
 
 **Repository:** https://github.com/liiandy/Hach-Nation-Hackathon---Genome-Firewall
 
-**Current main commit:** `c4b9aa4`
+**Current main commit:** `ffcb0de` (plus pending Track C UI changes on the
+working branch — see §4)
 
 ## Executive summary
 
@@ -139,18 +140,68 @@ python -m module2_predictor.evaluate
 It contains synthetic markers and labels. Its metrics are software test results,
 not biological evidence.
 
-### 4. Track C compatibility
+### 4. Track C — decision report app and interactive evaluation UI
 
-The Streamlit app and Track C evaluation entry point now consume the current
-Track B bundle and record schema. The app visibly labels synthetic mode and
-retains the mandatory laboratory-confirmation warning.
+The Streamlit app and Track C evaluation entry point consume the current Track B
+bundle and record schema. The report has been rebuilt into a professional,
+demo-ready interface:
+
+- **Professional clinical-blue theme** (`.streamlit/config.toml`, adapted from the
+  healthcare theme in `github.com/jmedia65/awesome-streamlit-themes`): IBM Plex
+  fonts, medical-blue palette, hairline borders — one cohesive design system.
+- **Decision cards with graded evidence.** Each drug shows a coloured verdict
+  badge, a calibrated-confidence bar, and a distinct evidence-tier pill:
+  known-marker (green, strongest), statistical-only (amber, "not proof of
+  mechanism"), or no-signal (grey). No-call cards are visually separated and list
+  every abstention reason in plain language (target absent, low QC, out-of-
+  distribution, marker/model conflict, low confidence).
+- **Prominent synthetic-mode disclosure ribbon.** The app states openly that it
+  runs on the synthetic fixture and that only the genomes are stand-ins — the
+  calibration, gating, no-call logic, grouped split, and metrics are real. Honest
+  disclosure is treated as submission value, not something to hide. The mandatory
+  laboratory-confirmation banner is retained at the top.
+- **Interactive evaluation, in-app.** A per-antibiotic performance chart (AUROC,
+  balanced accuracy, recall R/S) and per-drug calibration reliability curves are
+  rendered as interactive Plotly charts with hover tooltips, plus a held-out
+  metrics table. Colours use a validated monochrome-blue ramp (checked with the
+  data-viz validator: single hue, monotone lightness, sufficient contrast).
+- **FASTA-upload path connected to Track A's genome reader.** The
+  `build_feature_row_from_fasta()` seam now calls `module1_reader.run_genome_reader`
+  (pinned to the app's feature spec), and the "Upload a genome (FASTA)" tab drives
+  the full pipeline end to end: FASTA -> Track A reader -> contract-valid feature
+  row -> `predict_genome` -> the same report, rendered for the uploaded genome. No
+  Track A files were modified. It degrades honestly rather than faking a result: if
+  AMRFinderPlus is not installed the tab says so, a tool-free checkbox demonstrates
+  the wiring against Track A's bundled sample annotation (read-only), and an
+  uploaded-genome banner states plainly that the verdicts are a pipeline
+  demonstration, not biology — because the deployed bundle is still the synthetic
+  fixture, real gene names the reader finds (`blaKPC-2`, `gyrA_S83L`, …) are
+  preserved as unknown markers rather than scored. It becomes a real biological
+  result once Phase 0 publishes the shared `feature_spec.json` and Track B trains a
+  bundle on that vocabulary.
+- **Figures ported to the real contract.** `TrackC/make_figures.py` now reads
+  `data/synthetic/*` + the joblib bundle (was still on the old
+  `data/manifests/feature_spec.json` layout) and regenerates the static
+  `eval/fig_reliability.png` / `eval/fig_leakage.png` artifacts.
+
+Files: `TrackC/app.py`, `TrackC/charts.py` (new), `TrackC/make_figures.py`,
+`.streamlit/config.toml` (new). Runtime deps added: `streamlit`, `plotly`,
+`matplotlib` (Python 3.11).
+
+Run it:
+
+```bash
+python -m module2_predictor.train        # produces models/synthetic_bundle.joblib
+python -m module2_predictor.evaluate     # produces eval/*.csv consumed by the app
+streamlit run TrackC/app.py
+```
 
 Automated status:
 
 ```text
 12 tests passed
 Synthetic generate -> train -> predict -> evaluate passed
-Streamlit application test executed without exceptions
+Streamlit application test (AppTest) executed without exceptions
 ```
 
 ## What is not complete
@@ -162,7 +213,13 @@ Streamlit application test executed without exceptions
 5. Mash/Sourmash homology clusters and grouped splits do not exist yet.
 6. Track B has not been trained on real biological features.
 7. There are no real held-out performance or calibration results.
-8. The app does not yet process a real uploaded FASTA through Track A.
+8. The app is wired to Track A's genome reader (FASTA -> reader -> feature row ->
+   prediction runs end to end), but a real uploaded FASTA cannot yet yield a
+   biological result: AMRFinderPlus is not installed on the demo host, and the
+   deployed bundle is still the synthetic fixture, so real markers the reader finds
+   are preserved as unknown rather than scored. Unblocked by installing
+   AMRFinderPlus plus Phase 0's shared spec and a real Track B bundle (items 2, 5,
+   6 above).
 9. Attribution, final model card, demo narrative, and final scientific review
    remain incomplete.
 
