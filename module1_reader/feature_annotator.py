@@ -80,6 +80,32 @@ def load_project_config(path: Optional[Path] = None) -> Optional[dict]:
         return json.load(f)
 
 
+def load_qc_map(path) -> dict:
+    """
+    Read per-genome CheckM QC from a selected_genomes.csv into
+    {genome_id: {"completeness", "contamination", "contigs"}}.
+
+    Uses columns checkm_completeness, checkm_contamination, contigs — so we read the
+    QC the cohort already computed rather than re-running CheckM. A row missing its
+    genome_id or any QC value is skipped, leaving that genome QC-unknown (-> no-call).
+    """
+    qc: dict = {}
+    with open(path, newline="") as f:
+        for rec in csv.DictReader(f):
+            gid = rec.get("genome_id")
+            if not gid:
+                continue
+            try:
+                qc[gid] = {
+                    "completeness": float(rec["checkm_completeness"]),
+                    "contamination": float(rec["checkm_contamination"]),
+                    "contigs": int(rec["contigs"]),
+                }
+            except (KeyError, TypeError, ValueError):
+                continue   # unknown/malformed QC -> leave genome out (stays no-call)
+    return qc
+
+
 def spec_project_discrepancies(spec: dict, project: Optional[dict] = None) -> list[str]:
     """
     Cross-check the feature spec against Phase 0's project config.
@@ -162,13 +188,19 @@ def validate_feature_row(row: dict, spec: dict) -> dict:
             except (TypeError, ValueError):
                 nonbinary.append((col, v))
 
-    # QC columns: completeness/contamination are floats, contigs is an int
+    # QC columns: completeness/contamination are floats, contigs is an int.
+    # None means "QC unknown" — kept as None (not faked clean) so Track B routes it
+    # to no-call, per the guardrail "a missing QC value must not read as good".
     qf = spec["quality_features"]
     for col in quality_columns(spec):
         if col not in row:
             missing.append(col)
             continue
-        out[col] = int(row[col]) if col == qf["contigs"] else float(row[col])
+        v = row[col]
+        if v is None or v == "":
+            out[col] = None
+        else:
+            out[col] = int(v) if col == qf["contigs"] else float(v)
 
     if missing or nonbinary:
         parts = []
@@ -195,11 +227,14 @@ class FeatureAnnotator(ABC):
     to 0). See PrecomputedAnnotator for a copyable example.
     """
 
-    def __init__(self, spec: dict):
+    def __init__(self, spec: dict, qc_source: Optional[dict] = None):
         self.spec = spec
         # Markers seen on the most recent annotate() that are outside the vocabulary.
         # Preserved (not dropped) per the Track A guardrail; batch runs log them.
         self.last_unknown_markers: list[str] = []
+        # Optional {genome_id: {"completeness","contamination","contigs"}} used to
+        # fill real QC (e.g. from load_qc_map(selected_genomes.csv)).
+        self.qc_source = qc_source or {}
 
     @abstractmethod
     def annotate(self, genome_id: str, source) -> dict:
@@ -210,15 +245,25 @@ class FeatureAnnotator(ABC):
         return validate_feature_row(self.annotate(genome_id, source), self.spec)
 
     def _empty_row(self) -> dict:
-        """All markers absent, targets present, QC neutral — the base each backend fills in."""
+        """All markers absent, targets present, QC unknown — the base each backend fills in."""
         row = {c: 0 for c in marker_columns(self.spec)}
         for c in target_columns(self.spec):
             row[c] = 1  # targets assumed present until evidence of loss (see AMRFinderPlus backend)
-        qf = self.spec["quality_features"]
-        row[qf["completeness"]] = 100.0   # percent; QC no-call below quality_policy.minimum_completeness
-        row[qf["contamination"]] = 0.0    # percent
-        row[qf["contigs"]] = 0
+        # QC unknown until _fill_qc supplies it — NOT faked clean (guardrail: a
+        # missing QC value must read as no-call, never as a good assembly).
+        for c in quality_columns(self.spec):
+            row[c] = None
         return row
+
+    def _fill_qc(self, row: dict, genome_id: str) -> None:
+        """Fill QC columns from qc_source; leave unknown (None) if not available."""
+        qc = self.qc_source.get(genome_id)
+        if not qc:
+            return
+        qf = self.spec["quality_features"]
+        row[qf["completeness"]] = float(qc["completeness"])
+        row[qf["contamination"]] = float(qc["contamination"])
+        row[qf["contigs"]] = int(qc["contigs"])
 
 
 # --------------------------------------------------------------------------- #
@@ -293,8 +338,8 @@ class AMRFinderPlusAnnotator(FeatureAnnotator):
 
     def __init__(self, spec: dict, organism: Optional[str] = None,
                  amrfinder_bin: str = "amrfinder", extra_args: Optional[list] = None,
-                 precomputed_tsv: bool = False):
-        super().__init__(spec)
+                 precomputed_tsv: bool = False, qc_source: Optional[dict] = None):
+        super().__init__(spec, qc_source=qc_source)
         self.organism = organism
         self.amrfinder_bin = amrfinder_bin
         self.extra_args = extra_args or []
@@ -313,10 +358,9 @@ class AMRFinderPlusAnnotator(FeatureAnnotator):
         flags, unknown = parse_amrfinder_markers(tsv, self.spec)
         row.update(flags)
         self.last_unknown_markers = unknown   # preserved for review, not dropped
+        self._fill_qc(row, genome_id)         # real QC from qc_source, else unknown
         # TODO(target-presence): replace default-present targets with a real
         #   gene-presence check (e.g. BLAST each drug_targets gene vs the assembly).
-        # TODO(qc): fill qc_completeness / qc_contamination / qc_contigs from assembly
-        #   stats (CheckM for completeness+contamination; contig count from the FASTA).
         return row
 
     def _run(self, fasta_path: Path) -> Path:
@@ -343,8 +387,8 @@ class PrecomputedAnnotator(FeatureAnnotator):
     __init__/annotate shape, and swap the body of annotate() for your tool's logic.
     """
 
-    def __init__(self, spec: dict, table_path: Path):
-        super().__init__(spec)
+    def __init__(self, spec: dict, table_path: Path, qc_source: Optional[dict] = None):
+        super().__init__(spec, qc_source=qc_source)
         self.table_path = Path(table_path)
         self._rows = self._load_table(self.table_path)
 
@@ -365,6 +409,7 @@ class PrecomputedAnnotator(FeatureAnnotator):
             )
         row = self._empty_row()
         row.update({k: v for k, v in self._rows[genome_id].items() if k in row})
+        self._fill_qc(row, genome_id)   # qc_source overrides table QC when provided
         return row
 
 

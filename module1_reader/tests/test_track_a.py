@@ -13,7 +13,7 @@ import pytest
 import feature_annotator as fa
 from feature_annotator import (
     load_spec, validate_feature_row, parse_amrfinder_tsv, parse_amrfinder_markers,
-    marker_columns, target_columns, quality_columns, get_annotator,
+    marker_columns, target_columns, quality_columns, get_annotator, load_qc_map,
     PrecomputedAnnotator, ContractError, load_project_config, spec_project_discrepancies,
 )
 from build_features import run_genome_reader, build_features_table
@@ -266,3 +266,47 @@ def test_split_manifest_satisfies_track_b_contract(tmp_path, spec):
     # The real proof: Track B's own validator accepts our manifest + matching frames,
     # including its "no homology cluster crosses splits" assertion.
     contracts.validate_training_frames(features, labels, splits, spec)
+
+
+# --------------------------------------------------------------------------- #
+# 9. QC wiring — real values from the cohort manifest; unknown -> no-call
+# --------------------------------------------------------------------------- #
+def test_qc_unknown_defaults_to_none(spec):
+    # No qc_source -> QC columns are present but None (unknown), never faked clean.
+    row = run_genome_reader(genome_id="G1", backend="amrfinderplus",
+                            spec=spec, tsv_override=FIXTURE_TSV)
+    for col in quality_columns(spec):
+        assert col in row and row[col] is None
+
+
+def test_qc_filled_from_source(spec):
+    qf = spec["quality_features"]
+    qc_source = {"G1": {"completeness": 98.5, "contamination": 1.2, "contigs": 87}}
+    row = run_genome_reader(genome_id="G1", backend="amrfinderplus", spec=spec,
+                            tsv_override=FIXTURE_TSV, qc_source=qc_source)
+    assert row[qf["completeness"]] == 98.5
+    assert row[qf["contamination"]] == 1.2
+    assert row[qf["contigs"]] == 87
+
+
+def test_load_qc_map_reads_checkm_columns(tmp_path):
+    csvf = tmp_path / "selected_genomes.csv"
+    csvf.write_text(
+        "genome_id,checkm_completeness,checkm_contamination,contigs\n"
+        "573.1,99.4,0.3,84\n"
+        "573.2,88.0,6.1,700\n"
+    )
+    qc = load_qc_map(csvf)
+    assert qc["573.1"] == {"completeness": 99.4, "contamination": 0.3, "contigs": 84}
+    assert qc["573.2"]["contigs"] == 700
+
+
+def test_qc_aligns_with_track_b_quality_gate(spec):
+    predict = pytest.importorskip("module2_predictor.predict")
+    qf = spec["quality_features"]
+    base = {qf["completeness"]: 99.0, qf["contamination"]: 0.5, qf["contigs"]: 90}
+    assert predict._quality_gate(base, spec)["status"] == "pass"
+    bad = {qf["completeness"]: 80.0, qf["contamination"]: 0.5, qf["contigs"]: 90}
+    assert predict._quality_gate(bad, spec)["status"] == "fail"
+    unknown = {qf["completeness"]: None, qf["contamination"]: None, qf["contigs"]: None}
+    assert predict._quality_gate(unknown, spec)["status"] == "unknown"
