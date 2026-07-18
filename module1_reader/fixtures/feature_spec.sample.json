@@ -1,8 +1,8 @@
 {
-  "_comment": "SAMPLE contract — a Track-A dev stand-in ONLY, so Track A runs standalone before Phase 0 delivers. This is NOT the real spec and is NOT Track A's deliverable: the real feature_spec.json is Phase 0's (the domain expert's) shared artifact and belongs at data/manifests/feature_spec.json. Track A reads that real file when it exists and falls back to this sample when it does not. Every gene/mutation/target below is a plausible K. pneumoniae placeholder for testing shape only.",
+  "_comment": "SAMPLE contract — a Track-A dev stand-in ONLY, so this module runs standalone before Phase 0 delivers. This is NOT the real spec and is NOT Track A's deliverable: the real feature_spec.json is Phase 0's (the domain expert's) shared artifact and belongs at data/manifests/feature_spec.json. This sample is kept ALIGNED with data/config/project.json (species + drug panel); the module cross-checks the two at load time. Every gene/mutation/target below is a plausible K. pneumoniae placeholder for testing shape only.",
 
   "species": "Klebsiella pneumoniae",
-  "drugs": ["ciprofloxacin", "meropenem", "gentamicin"],
+  "drugs": ["meropenem", "ciprofloxacin", "gentamicin", "ceftazidime"],
 
   "annotation_tool": "AMRFinderPlus",
   "annotation_tool_version": "PLACEHOLDER-pin-at-setup",
@@ -12,6 +12,7 @@
     "gyrA_S83L", "gyrA_D87N", "parC_S80I", "qnrB1", "oqxAB",
     "blaKPC-2", "blaNDM-1", "blaOXA-48", "ompK36_loss",
     "aac(3)-IIa", "aac(6')-Ib", "armA", "rmtB",
+    "blaCTX-M-15", "blaSHV-12",
     "target__gyrA", "target__parC", "target__ftsI", "target__rrs"
   ],
 
@@ -28,7 +29,9 @@
     "aac(3)-IIa": "gentamicin",
     "aac(6')-Ib": "gentamicin",
     "armA": "gentamicin",
-    "rmtB": "gentamicin"
+    "rmtB": "gentamicin",
+    "blaCTX-M-15": "ceftazidime",
+    "blaSHV-12": "ceftazidime"
   },
 
   "marker_types": {
@@ -44,13 +47,16 @@
     "aac(3)-IIa": "gene",
     "aac(6')-Ib": "gene",
     "armA": "gene",
-    "rmtB": "gene"
+    "rmtB": "gene",
+    "blaCTX-M-15": "gene",
+    "blaSHV-12": "gene"
   },
 
   "drug_targets": {
-    "ciprofloxacin": ["gyrA", "parC"],
     "meropenem": ["ftsI"],
-    "gentamicin": ["rrs"]
+    "ciprofloxacin": ["gyrA", "parC"],
+    "gentamicin": ["rrs"],
+    "ceftazidime": ["ftsI"]
   },
 
   "marker_aliases": {

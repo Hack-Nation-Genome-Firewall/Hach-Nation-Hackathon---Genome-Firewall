@@ -20,6 +20,13 @@ it, Track A falls back to a bundled dev stand-in, `fixtures/feature_spec.sample.
 purely so this module runs standalone. `load_spec()` prefers the shared file when it
 exists and uses the sample otherwise.
 
+**Connection to the shared project config:** this module also reads (read-only)
+Phase 0's `data/config/project.json` — the declared species, drug panel, and QC
+policy. `spec_project_discrepancies()` cross-checks the spec against it, and a test
+fails if our sample drifts from the team's declared species/drugs. The sample is kept
+aligned with that config (currently 4 drugs: meropenem, ciprofloxacin, gentamicin,
+ceftazidime). We never write that file — Phase 0 owns it.
+
 ## Run it
 
 ```bash

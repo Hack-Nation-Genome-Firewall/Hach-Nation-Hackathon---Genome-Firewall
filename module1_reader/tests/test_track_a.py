@@ -13,6 +13,7 @@ import feature_annotator as fa
 from feature_annotator import (
     load_spec, validate_feature_row, parse_amrfinder_tsv, marker_columns,
     target_columns, get_annotator, PrecomputedAnnotator, ContractError,
+    load_project_config, spec_project_discrepancies,
 )
 from build_features import run_genome_reader
 
@@ -142,4 +143,22 @@ def test_spec_falls_back_to_bundled_sample():
     assert not fa.SHARED_SPEC_PATH.exists()
     s = load_spec()
     assert s["species"] == "Klebsiella pneumoniae"
-    assert s["drugs"] == ["ciprofloxacin", "meropenem", "gentamicin"]
+    assert set(s["drugs"]) == {"meropenem", "ciprofloxacin", "gentamicin", "ceftazidime"}
+
+
+# --------------------------------------------------------------------------- #
+# 6. Connection to Phase 0's shared project config
+# --------------------------------------------------------------------------- #
+def test_project_config_is_readable():
+    project = load_project_config()
+    if project is None:
+        pytest.skip("data/config/project.json not present in this checkout")
+    assert "antibiotics" in project and len(project["antibiotics"]) >= 1
+
+
+def test_sample_spec_stays_aligned_with_project_config(spec):
+    # Tripwire: fails if our sample drifts from the team's declared species/drugs.
+    project = load_project_config()
+    if project is None:
+        pytest.skip("data/config/project.json not present in this checkout")
+    assert spec_project_discrepancies(spec, project) == []

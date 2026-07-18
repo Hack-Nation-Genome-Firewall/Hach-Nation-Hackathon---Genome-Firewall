@@ -46,6 +46,10 @@ MODULE_DIR = Path(__file__).resolve().parent
 SHARED_SPEC_PATH = HERE / "data/manifests/feature_spec.json"
 SAMPLE_SPEC_PATH = MODULE_DIR / "fixtures/feature_spec.sample.json"
 
+# Phase 0's shared project config (species, drug panel, QC policy). We consume it
+# read-only to stay aligned with the rest of the team; we never write it.
+PROJECT_CONFIG_PATH = HERE / "data/config/project.json"
+
 
 # --------------------------------------------------------------------------- #
 # The frozen contract
@@ -65,6 +69,40 @@ def load_spec(path: Optional[Path] = None) -> dict:
         chosen = SAMPLE_SPEC_PATH
     with open(chosen) as f:
         return json.load(f)
+
+
+def load_project_config(path: Optional[Path] = None) -> Optional[dict]:
+    """Read Phase 0's shared project config, or None if it hasn't landed yet."""
+    path = Path(path) if path else PROJECT_CONFIG_PATH
+    if not path.exists():
+        return None
+    with open(path) as f:
+        return json.load(f)
+
+
+def spec_project_discrepancies(spec: dict, project: Optional[dict] = None) -> list[str]:
+    """
+    Cross-check the feature spec against Phase 0's project config.
+
+    Returns a list of human-readable mismatches (empty = aligned). Used to catch
+    drift between what we featurize and the team's declared species/drug panel.
+    Returns [] when no project config exists yet (nothing to check against).
+    """
+    project = project if project is not None else load_project_config()
+    if project is None:
+        return []
+    issues = []
+    proj_species = (project.get("species") or {}).get("name")
+    if proj_species and proj_species != spec.get("species"):
+        issues.append(f"species mismatch: spec={spec.get('species')!r} project={proj_species!r}")
+    proj_drugs = set(project.get("antibiotics", []))
+    spec_drugs = set(spec.get("drugs", []))
+    if proj_drugs:
+        if proj_drugs - spec_drugs:
+            issues.append(f"drugs in project.json missing from spec: {sorted(proj_drugs - spec_drugs)}")
+        if spec_drugs - proj_drugs:
+            issues.append(f"drugs in spec not in project.json: {sorted(spec_drugs - proj_drugs)}")
+    return issues
 
 
 def target_columns(spec: dict) -> list[str]:
