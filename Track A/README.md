@@ -47,6 +47,19 @@ from build_features import run_genome_reader
 row = run_genome_reader("genome.fasta", genome_id="G1")   # -> validated feature dict
 ```
 
+## Tests
+
+Fast, deterministic, no AMRFinderPlus needed (they use the bundled fixtures):
+
+```bash
+pip install pytest
+pytest "Track A/tests"
+```
+
+They lock down the fragile parts: the exact feature-column order (the tripwire for
+a silent contract break), TSV parsing + alias mapping, unknown-marker dropping, the
+validation gate's rejections, the precomputed backend, and the spec fallback.
+
 ## Adding your own annotation source (the door is already open)
 
 You do **not** edit the pipeline. Three steps:
