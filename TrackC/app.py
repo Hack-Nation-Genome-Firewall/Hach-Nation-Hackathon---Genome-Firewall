@@ -240,14 +240,45 @@ def render_card(rec: dict) -> str:
     return _flatten(card)
 
 
-def build_feature_row_from_fasta(fasta_bytes: bytes) -> dict:
-    """SEAM for Track A. A genome FASTA -> the feature-contract row the model
-    consumes. Track A's genome reader (AMRFinderPlus -> marker/target/QC flags,
-    in `feature_spec.model_features` order) plugs in here. Until then this raises
-    so the UI shows an honest 'integration pending' notice instead of faking it."""
-    raise NotImplementedError(
-        "Track A genome reader (module1_reader.run_genome_reader) is not wired yet."
-    )
+MODULE1_DIR = HERE / "module1_reader"
+SAMPLE_TSV = MODULE1_DIR / "fixtures" / "sample_amrfinder.tsv"
+
+
+def _amrfinder_available() -> bool:
+    """Is the AMRFinderPlus binary on PATH? Decides whether the upload tab defaults
+    to real annotation or to the tool-free wiring demo."""
+    import shutil
+    return shutil.which("amrfinder") is not None
+
+
+def build_feature_row_from_fasta(
+    fasta_bytes: bytes, *, genome_id: str = "uploaded_genome",
+    organism: str = "Klebsiella_pneumoniae", tsv_override=None,
+) -> tuple[dict, list]:
+    """SEAM for Track A — now wired to `module1_reader.run_genome_reader`.
+
+    Writes the uploaded bytes to a temp FASTA and hands it to Track A's genome
+    reader, pinning it to THIS app's feature spec so the row it returns already
+    matches the contract the deployed bundle was trained on. Track A's files are
+    used unmodified. Returns (validated feature row, unknown markers preserved by
+    the reader). `tsv_override` runs the reader against a saved AMRFinderPlus TSV
+    (Track A's bundled sample) so the wiring is demonstrable without the tool
+    installed. Raises FileNotFoundError if AMRFinderPlus is not on PATH."""
+    import tempfile
+    if str(MODULE1_DIR) not in sys.path:
+        sys.path.insert(0, str(MODULE1_DIR))  # Track A uses bare intra-module imports
+    from build_features import run_genome_reader  # Track A entry point (untouched)
+
+    unknown: list = []
+    with tempfile.NamedTemporaryFile("wb", suffix=".fasta") as tmp:
+        tmp.write(fasta_bytes)
+        tmp.flush()
+        row = run_genome_reader(
+            tmp.name, genome_id=genome_id, backend="amrfinderplus", spec=SPEC,
+            organism=organism, tsv_override=tsv_override, unknown_markers_out=unknown,
+        )
+    row.setdefault("genome_id", genome_id)
+    return row, unknown
 
 
 # ---------------------------------------------------------------------------
@@ -265,16 +296,32 @@ with tab_demo:
 with tab_upload:
     up = st.file_uploader("Assembled genome — FASTA (.fasta / .fa / .fna)",
                           type=["fasta", "fa", "fna"])
-    st.caption("This path runs the real genome → features → prediction pipeline once "
-               "Track A's AMRFinderPlus reader is connected.")
+    st.caption("This runs the real pipeline: your genome → Track A's reader "
+               "(`module1_reader.run_genome_reader`) → feature row → prediction. "
+               "The report below then renders for **your** genome.")
+    demo_wiring = st.checkbox(
+        "AMRFinderPlus isn't installed here — prove the wiring with Track A's bundled "
+        "sample annotation instead", value=not _amrfinder_available(),
+        help="Runs the reader against module1_reader/fixtures/sample_amrfinder.tsv "
+             "(read-only) so the FASTA → reader → prediction path is demonstrable "
+             "without the tool.")
     if up is not None:
+        tsv_override = str(SAMPLE_TSV) if (demo_wiring and SAMPLE_TSV.exists()) else None
         try:
-            _ = build_feature_row_from_fasta(up.getvalue())
-        except NotImplementedError:
-            st.info(f"✅ Received **{up.name}** ({up.size/1000:.0f} kB). "
-                    "Track A's genome reader (`module1_reader.run_genome_reader`) plugs in "
-                    "at `build_feature_row_from_fasta()` — it will build the feature row and "
-                    "the same report below will render. Using the demo genome for now.")
+            up_row, up_unknown = build_feature_row_from_fasta(
+                up.getvalue(), genome_id=up.name, tsv_override=tsv_override)
+            row, gid = up_row, up.name          # drive the report from the upload
+            st.session_state["_uploaded"] = (up.name, up_unknown, bool(tsv_override))
+            st.success(f"✅ Track A's reader parsed **{up.name}** "
+                       f"({up.size/1000:.0f} kB) into a contract-valid feature row.")
+        except FileNotFoundError:
+            st.warning(
+                "The reader is fully wired, but **AMRFinderPlus is not installed on "
+                "this host**, so a raw FASTA can't be annotated here. Tick the box "
+                "above to demonstrate the FASTA → reader → prediction path with Track "
+                "A's bundled sample annotation, or install AMRFinderPlus to run for real.")
+        except Exception as e:  # ContractError and friends — surface the real reason
+            st.error(f"Track A's reader could not build a feature row: {e}")
 
 if not BUNDLE_PATH.exists():
     st.error("Model bundle is missing. Run `python -m module2_predictor.train` first.")
@@ -285,6 +332,22 @@ recs = predict_genome(row, bundle, SPEC)
 # ---- summary strip ----
 counts = Counter(r["verdict"] for r in recs)
 st.subheader(f"Antibiotic-response report — `{gid}`")
+
+_uploaded = st.session_state.get("_uploaded")
+if _uploaded and _uploaded[0] == gid:
+    _name, _unknown, _via_sample = _uploaded
+    _src = "Track A's bundled sample annotation" if _via_sample else "AMRFinderPlus"
+    _found = ", ".join(f"`{m}`" for m in _unknown[:12]) + (" …" if len(_unknown) > 12 else "")
+    st.info(
+        f"🔗 **Live Track A wiring.** This report was built end to end from your "
+        f"upload: **{_name}** → {_src} → feature row → prediction. The reader parsed "
+        f"the genome and preserved **{len(_unknown)} marker(s)** it found"
+        + (f": {_found}" if _unknown else "")
+        + ". Because the *deployed model* is still the synthetic fixture (its "
+        "vocabulary is `marker__known__*`, not real gene names), those real markers "
+        "are carried as **unknown** rather than scored — so the verdicts below are a "
+        "**pipeline demonstration, not a biological result**. They become meaningful "
+        "once Phase 0 publishes the shared spec and Track B trains a bundle on it.")
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("Antibiotics", len(recs))
 m2.metric("Likely to work", counts.get("likely_to_work", 0))
