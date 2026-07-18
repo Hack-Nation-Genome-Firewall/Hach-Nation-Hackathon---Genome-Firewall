@@ -1,7 +1,9 @@
 # Genome Firewall: Team Status and Next Steps
 
-**Status snapshot:** 18 July 2026 (Reykjavik)  
-**Repository:** https://github.com/liiandy/Hach-Nation-Hackathon---Genome-Firewall  
+**Status snapshot:** 18 July 2026 (Reykjavik)
+
+**Repository:** https://github.com/liiandy/Hach-Nation-Hackathon---Genome-Firewall
+
 **Current main commit:** `c4b9aa4`
 
 ## Executive summary
