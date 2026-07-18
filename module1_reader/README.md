@@ -95,18 +95,38 @@ Two "bring your own" cases, both already covered:
 - **your own tool** (still start from FASTA) → new `FeatureAnnotator` subclass.
 - **your own dataset / features** (skip annotation) → the `precomputed` backend.
 
+## Homology-grouped split manifest (`split_manifest.py`)
+
+Produces `split_manifest.csv` (`genome_id,cluster_id,split`) — required by Track B,
+which asserts no homology cluster crosses splits. Two steps:
+
+1. **cluster genomes by DNA similarity** → `cluster_id` (Mash/sourmash) — *pluggable*,
+   `MashClusterer` is a documented stub; use precomputed clusters via `load_clusters_csv()`.
+2. **assign whole clusters to train/calibration/test** — *done*: deterministic (seeded),
+   greedy largest-cluster-first, whole clusters only, so no cluster can straddle splits.
+
+```python
+from split_manifest import build_split_manifest, load_clusters_csv
+clusters = load_clusters_csv("clusters.csv")   # genome_id,cluster_id
+build_split_manifest(clusters, "split_manifest.csv", seed=20260718,
+                     feature_genome_ids=feature_ids)
+```
+
+A test builds a manifest and runs it through Track B's own
+`validate_training_frames` (including the no-leak assertion), so the output is
+provably contract-valid.
+
 ## Known TODOs (honest limitations)
 
+- **Mash clustering** (step 1 above): needs Mash + the genome FASTAs (not in the repo).
+  Until then, feed precomputed clusters. The threshold is an expert-approved knob.
 - **Target-presence flags** (`target__<gene>`): AMRFinderPlus reports resistance
   markers, not whether a drug's *target* gene is present/intact. These default to
   present (1) until a real gene-presence check (e.g. BLAST the target gene vs the
   assembly) is wired into `AMRFinderPlusAnnotator.annotate()`.
 - **`ompK36_loss`** is a derived *absence* feature, not a direct AMRFinderPlus hit.
-- **QC columns** (`qc_completeness`, `qc_contamination`, `qc_contigs`) need to be
-  filled from assembly stats (CheckM for completeness/contamination; contig count
-  from the FASTA).
-- **`split_manifest.csv`** (homology-grouped `genome_id,cluster_id,split`) is a Track A
-  deliverable per `docs/TRACK_A_HANDOFF.md` and is not produced yet — needs Mash/sourmash
-  clustering.
+- **QC columns** (`qc_completeness`, `qc_contamination`, `qc_contigs`): can be read
+  straight from `data/manifests/selected_genomes.csv` (which already has CheckM
+  completeness/contamination + contig count) instead of re-running CheckM.
 - **Pin the DB**: record `amrfinder -V` into `feature_spec.json`
   (`annotation_tool_version`, `database_version`) at setup and never update mid-event.

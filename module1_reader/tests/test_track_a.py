@@ -211,3 +211,58 @@ def test_feature_row_passes_track_b_inference_validation(spec):
     row = run_genome_reader(genome_id="G1", backend="amrfinderplus",
                             spec=spec, tsv_override=FIXTURE_TSV)
     contracts.validate_inference_row(row, spec)   # raises if Track B would reject the row
+
+
+# --------------------------------------------------------------------------- #
+# 8. Homology-grouped split manifest
+# --------------------------------------------------------------------------- #
+def _clusters(n_clusters=5, per=4):
+    return {f"g{c}_{i}": f"cluster_{c}" for c in range(n_clusters) for i in range(per)}
+
+
+def test_split_assigns_whole_clusters_and_all_splits_used():
+    from split_manifest import assign_clusters_to_splits
+    cluster_of = _clusters()
+    genome_split, cluster_split = assign_clusters_to_splits(cluster_of, seed=20260718)
+    # every genome in a cluster shares that cluster's split (no cluster crosses splits)
+    for gid, cid in cluster_of.items():
+        assert genome_split[gid] == cluster_split[cid]
+    assert set(cluster_split.values()) == {"train", "calibration", "test"}
+
+
+def test_split_is_deterministic():
+    from split_manifest import assign_clusters_to_splits
+    cluster_of = _clusters(8, 3)
+    a, _ = assign_clusters_to_splits(cluster_of, seed=20260718)
+    b, _ = assign_clusters_to_splits(cluster_of, seed=20260718)
+    assert a == b
+
+
+def test_split_too_few_clusters_raises():
+    from split_manifest import assign_clusters_to_splits
+    with pytest.raises(ValueError):
+        assign_clusters_to_splits({"g0": "c0", "g1": "c1"})   # only 2 clusters
+
+
+def test_split_manifest_satisfies_track_b_contract(tmp_path, spec):
+    pd = pytest.importorskip("pandas")
+    contracts = pytest.importorskip("module2_predictor.contracts")
+    from split_manifest import build_split_manifest
+
+    cluster_of = _clusters(6, 3)                       # 18 genomes, 6 clusters
+    manifest = build_split_manifest(cluster_of, tmp_path / "split.csv",
+                                    seed=20260718, feature_genome_ids=list(cluster_of))
+
+    features = pd.DataFrame(
+        [{"genome_id": g, **{m: 0 for m in spec["model_features"]}} for g in cluster_of]
+    )
+    labels = pd.DataFrame(
+        [{"genome_id": g, "antibiotic": d, "phenotype": "Susceptible",
+          "evidence": spec["expected_label_evidence"]}
+         for g in cluster_of for d in spec["drugs"]]
+    )
+    splits = pd.read_csv(manifest, dtype={"genome_id": str, "cluster_id": str})
+
+    # The real proof: Track B's own validator accepts our manifest + matching frames,
+    # including its "no homology cluster crosses splits" assertion.
+    contracts.validate_training_frames(features, labels, splits, spec)
