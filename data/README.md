@@ -25,10 +25,14 @@ manifest and checksums identify every input without putting gigabytes in Git.
 
 - Include `Susceptible` and `Resistant` laboratory records.
 - Exclude `Intermediate` from the binary baseline.
+- Audit and exclude laboratory/MIC records that do not provide a categorical
+  S/R phenotype; never infer a label without an expert-approved breakpoint.
 - Collapse repeated records that agree.
 - Exclude genome/drug pairs with conflicting S/R records.
 - Preserve MIC, testing-standard, method, publication, and source metadata.
 - Apply genome-quality criteria before selection.
+- Prefer genomes with results for more configured drugs, then use a seeded
+  SHA-256 rank to cap the cohort deterministically.
 - Split by a separately computed homology cluster; never randomly split rows.
 
 The current policy is provisional until approved by the domain expert.
