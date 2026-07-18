@@ -61,6 +61,20 @@ python -m data.download_genomes --workers 4
 Use `--limit 5` for a small end-to-end download check. Acquisition refuses to
 overwrite existing raw snapshots unless `--overwrite` is explicitly supplied.
 
+Generate the deterministic Track B integration fixture, train, predict, and
+evaluate:
+
+```bash
+python scripts/make_synthetic_fixture.py
+python -m module2_predictor.train
+python -m module2_predictor.predict
+python -m module2_predictor.evaluate
+```
+
+Synthetic metrics prove that the software contracts run; they are not
+biological performance results. Real training must supply AMRFinderPlus features
+and a homology-grouped split using the same command-line arguments.
+
 ## Safety boundary
 
 The system accepts an already assembled, quality-checked genome. It does not

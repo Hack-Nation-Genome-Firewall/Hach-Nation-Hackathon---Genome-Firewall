@@ -11,8 +11,10 @@ data/genomes/
 data/generated/
 models/*.joblib
 models/*.pkl
+models/*.training.json
 eval/*.csv
 eval/*.png
+eval/*.json
 
 # Local secrets and editor files
 .env
