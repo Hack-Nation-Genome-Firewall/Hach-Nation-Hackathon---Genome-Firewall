@@ -1,0 +1,83 @@
+{
+  "drug_targets": {
+    "ceftazidime": [
+      "target__ceftazidime"
+    ],
+    "ciprofloxacin": [
+      "target__ciprofloxacin"
+    ],
+    "gentamicin": [
+      "target__gentamicin"
+    ],
+    "meropenem": [
+      "target__meropenem"
+    ]
+  },
+  "drugs": [
+    "meropenem",
+    "ciprofloxacin",
+    "gentamicin",
+    "ceftazidime"
+  ],
+  "expected_label_evidence": "Synthetic fixture",
+  "marker_evidence": {
+    "marker__known__ceftazidime": {
+      "amrfinder_method": "SYNTHETIC",
+      "drugs": [
+        "ceftazidime"
+      ],
+      "source": "Synthetic integration fixture; not biological evidence",
+      "type": "synthetic_marker"
+    },
+    "marker__known__ciprofloxacin": {
+      "amrfinder_method": "SYNTHETIC",
+      "drugs": [
+        "ciprofloxacin"
+      ],
+      "source": "Synthetic integration fixture; not biological evidence",
+      "type": "synthetic_marker"
+    },
+    "marker__known__gentamicin": {
+      "amrfinder_method": "SYNTHETIC",
+      "drugs": [
+        "gentamicin"
+      ],
+      "source": "Synthetic integration fixture; not biological evidence",
+      "type": "synthetic_marker"
+    },
+    "marker__known__meropenem": {
+      "amrfinder_method": "SYNTHETIC",
+      "drugs": [
+        "meropenem"
+      ],
+      "source": "Synthetic integration fixture; not biological evidence",
+      "type": "synthetic_marker"
+    }
+  },
+  "model_features": [
+    "marker__known__meropenem",
+    "marker__known__ciprofloxacin",
+    "marker__known__gentamicin",
+    "marker__known__ceftazidime",
+    "marker__lineage_a",
+    "marker__lineage_b",
+    "marker__background"
+  ],
+  "quality_features": {
+    "completeness": "qc_completeness",
+    "contamination": "qc_contamination",
+    "contigs": "qc_contigs"
+  },
+  "quality_policy": {
+    "maximum_contamination": 5.0,
+    "maximum_contigs": 500,
+    "minimum_completeness": 90.0
+  },
+  "schema_version": 1,
+  "species": {
+    "name": "Klebsiella pneumoniae",
+    "taxon_id": 573
+  },
+  "status": "integration_fixture_not_biological_data",
+  "synthetic": true
+}

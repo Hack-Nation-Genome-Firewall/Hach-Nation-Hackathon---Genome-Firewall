@@ -1,86 +1,265 @@
-"""
-GENOME FIREWALL — Module 2 inference.
+"""Validated single-genome inference for calibrated Track B model bundles."""
 
-Turns one genome's feature row into a per-drug decision record with:
-  - deterministic target-presence gate
-  - calibrated probability
-  - no-call abstention
-  - honest evidence tier + supporting markers
+from __future__ import annotations
 
-This is REFERENCE code trained on SYNTHETIC data so the whole team can build
-against a working example. Swap in the real AMRFinderPlus features + BV-BRC
-labels and retrain (module2_predictor/train.py) — the contract does not change.
-"""
-import json, pickle
+import argparse
+import json
+import math
 from pathlib import Path
+from typing import Any, Mapping
 
-HERE = Path(__file__).resolve().parents[1]
-SPEC = json.load(open(HERE / "data/manifests/feature_spec.json"))
-MARKER_DRUG = SPEC["marker_drug"]     # marker -> drug it drives
-MARKER_TYPE = SPEC["marker_types"]    # marker -> gene/point/efflux
+import joblib
+import numpy as np
+import pandas as pd
 
-
-def load_bundle(path=None):
-    path = path or (HERE / "models/models.pkl")
-    with open(path, "rb") as f:
-        return pickle.load(f)
+from module2_predictor.contracts import canonical_json_sha256, load_feature_spec, validate_inference_row
 
 
-def _evidence(row, drug):
-    """(i) known resistance marker present -> known_marker; else decided later."""
-    present = [m for m, d in MARKER_DRUG.items() if d == drug and row.get(m, 0) == 1]
-    return ("known_marker", present) if present else (None, [])
+ROOT = Path(__file__).resolve().parents[1]
+SYNTHETIC = ROOT / "data/synthetic"
+DEFAULT_BUNDLE = ROOT / "models/synthetic_bundle.joblib"
+DEFAULT_SPEC = SYNTHETIC / "feature_spec.json"
 
 
-def predict_drug(row, bundle, drug):
-    clf, iso = bundle["models"][drug], bundle["calibrators"][drug]
-    order = bundle["feature_order"]
-    import numpy as np
-    x = np.array([[row.get(m, 0) for m in order]])
-    p = float(iso.transform(clf.predict_proba(x)[:, 1])[0])   # calibrated P(fail)
-    conf = abs(p - 0.5) * 2
-    band = bundle["nocall_band"]
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--bundle", type=Path, default=DEFAULT_BUNDLE)
+    parser.add_argument("--spec", type=Path, default=DEFAULT_SPEC)
+    parser.add_argument("--features", type=Path, default=SYNTHETIC / "features.csv")
+    parser.add_argument("--splits", type=Path, default=SYNTHETIC / "split_manifest.csv")
+    parser.add_argument("--genome-id")
+    return parser.parse_args()
 
-    # deterministic target-presence gate (independent of the ML model)
-    targets = bundle["drug_targets"][drug]
-    tgt_present = all(row.get(f"target__{g}", 1) == 1 for g in targets)
-    gate = {"target_genes": targets, "present": bool(tgt_present)}
 
-    tier, markers = _evidence(row, drug)
+def load_bundle(path: Path | str = DEFAULT_BUNDLE) -> dict[str, Any]:
+    bundle = joblib.load(path)
+    required = {
+        "bundle_schema_version",
+        "model_version",
+        "drugs",
+        "model_features",
+        "feature_spec",
+        "feature_spec_sha256",
+        "drug_models",
+    }
+    missing = sorted(required - bundle.keys())
+    if missing:
+        raise ValueError(f"Model bundle is missing keys: {missing}")
+    actual_sha = canonical_json_sha256(bundle["feature_spec"])
+    if actual_sha != bundle["feature_spec_sha256"]:
+        raise ValueError("Model bundle feature specification checksum is invalid")
+    return bundle
 
-    reason = None
-    if not tgt_present:
-        verdict, reason = "no_call", "drug target absent/disrupted — cannot assert susceptibility"
-        gate["action"] = "route_to_no_call"
-    elif row.get("qc_complete", 1.0) < 0.90 or row.get("qc_contigs", 0) > 500:
-        verdict, reason, gate["action"] = "no_call", "low assembly quality", "proceed"
-    elif conf < band:
-        verdict, reason, gate["action"] = "no_call", f"low confidence (conf={conf:.2f} < {band})", "proceed"
-    else:
-        verdict = "likely_to_fail" if p >= 0.5 else "likely_to_work"
-        gate["action"] = "proceed"
 
-    if tier is None:
-        tier = "statistical_only" if verdict in ("likely_to_fail", "likely_to_work") else "no_signal"
+def _missing(value: Any) -> bool:
+    return value is None or value is pd.NA or (isinstance(value, float) and math.isnan(value))
 
+
+def _target_gate(row: Mapping[str, Any], spec: Mapping[str, Any], drug: str) -> dict[str, Any]:
+    target_features = list(spec["drug_targets"][drug])
+    missing = [feature for feature in target_features if feature not in row or _missing(row.get(feature))]
+    invalid = [
+        feature
+        for feature in target_features
+        if feature in row and not _missing(row.get(feature)) and row.get(feature) not in (0, 1, False, True)
+    ]
+    if missing or invalid:
+        return {
+            "target_features": target_features,
+            "status": "unknown",
+            "present": None,
+            "action": "route_to_no_call",
+            "details": {"missing": missing, "invalid": invalid},
+        }
+    absent = [feature for feature in target_features if int(row[feature]) == 0]
+    if absent:
+        return {
+            "target_features": target_features,
+            "status": "absent_or_disrupted",
+            "present": False,
+            "action": "route_to_no_call",
+            "details": {"absent_or_disrupted": absent},
+        }
     return {
-        "drug": drug, "verdict": verdict, "p_fail": round(p, 3),
-        "confidence": round(conf, 3), "calibrated": True, "evidence_tier": tier,
-        "supporting_markers": [{"marker": m, "type": MARKER_TYPE[m]} for m in markers],
-        "target_gate": gate, "no_call_reason": reason,
+        "target_features": target_features,
+        "status": "present",
+        "present": True,
+        "action": "proceed",
+        "details": {},
     }
 
 
-def predict_genome(row, bundle=None):
+def _quality_gate(row: Mapping[str, Any], spec: Mapping[str, Any]) -> dict[str, Any]:
+    features = spec["quality_features"]
+    policy = spec["quality_policy"]
+    missing = [column for column in features.values() if column not in row or _missing(row.get(column))]
+    if missing:
+        return {"status": "unknown", "action": "route_to_no_call", "reasons": [f"missing:{','.join(missing)}"]}
+    reasons: list[str] = []
+    completeness = float(row[features["completeness"]])
+    contamination = float(row[features["contamination"]])
+    contigs = int(row[features["contigs"]])
+    if completeness < float(policy["minimum_completeness"]):
+        reasons.append("completeness_below_minimum")
+    if contamination > float(policy["maximum_contamination"]):
+        reasons.append("contamination_above_maximum")
+    if contigs > int(policy["maximum_contigs"]):
+        reasons.append("contigs_above_maximum")
+    return {
+        "status": "fail" if reasons else "pass",
+        "action": "route_to_no_call" if reasons else "proceed",
+        "reasons": reasons,
+        "observed": {
+            "completeness": completeness,
+            "contamination": contamination,
+            "contigs": contigs,
+        },
+    }
+
+
+def _minimum_hamming_distance(reference: np.ndarray, row: np.ndarray) -> float:
+    matrix = np.asarray(reference, dtype=np.uint8)
+    vector = np.asarray(row, dtype=np.uint8).reshape(-1)
+    if matrix.ndim != 2 or matrix.shape[1] != len(vector) or not len(matrix):
+        raise ValueError("Invalid OOD reference matrix in model bundle")
+    return float(np.mean(matrix != vector, axis=1).min())
+
+
+def _evidence(
+    row: Mapping[str, Any],
+    spec: Mapping[str, Any],
+    drug: str,
+    coefficients: np.ndarray,
+) -> tuple[str, list[dict[str, Any]], list[dict[str, Any]]]:
+    known: list[dict[str, Any]] = []
+    known_names: set[str] = set()
+    for marker, metadata in spec["marker_evidence"].items():
+        if drug in metadata.get("drugs", []) and int(row.get(marker, 0)) == 1:
+            known_names.add(marker)
+            known.append(
+                {
+                    "marker": marker,
+                    "type": metadata.get("type", "unknown"),
+                    "source": metadata.get("source"),
+                    "amrfinder_method": metadata.get("amrfinder_method"),
+                }
+            )
+    statistical: list[dict[str, Any]] = []
+    for feature, coefficient in zip(spec["model_features"], coefficients, strict=True):
+        if int(row[feature]) == 1 and feature not in known_names and abs(float(coefficient)) > 1e-9:
+            statistical.append({"feature": feature, "coefficient": round(float(coefficient), 6)})
+    statistical.sort(key=lambda item: abs(item["coefficient"]), reverse=True)
+    statistical = statistical[:5]
+    if known:
+        tier = "known_marker"
+    elif statistical:
+        tier = "statistical_only"
+    else:
+        tier = "no_signal"
+    return tier, known, statistical
+
+
+def predict_drug(
+    row: Mapping[str, Any],
+    bundle: Mapping[str, Any],
+    drug: str,
+    spec: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    spec = spec or bundle["feature_spec"]
+    validate_inference_row(row, spec)
+    if canonical_json_sha256(spec) != bundle["feature_spec_sha256"]:
+        raise ValueError("Inference feature specification does not match the trained bundle")
+    if drug not in bundle["drug_models"]:
+        raise ValueError(f"Unsupported antibiotic: {drug}")
+    model = bundle["drug_models"][drug]
+    vector = np.asarray([[int(row[feature]) for feature in bundle["model_features"]]], dtype=np.uint8)
+    raw_probability = model["classifier"].predict_proba(vector)[:, 1]
+    p_fail = float(model["calibrator"].predict(raw_probability)[0])
+    verdict_probability = max(p_fail, 1.0 - p_fail)
+    statistical_verdict = "likely_to_fail" if p_fail >= 0.5 else "likely_to_work"
+
+    target_gate = _target_gate(row, spec, drug)
+    quality_gate = _quality_gate(row, spec)
+    ood_distance = _minimum_hamming_distance(model["ood_reference"], vector[0])
+    ood = ood_distance > float(model["ood_threshold"]) + 1e-12
+    tier, known_markers, statistical_features = _evidence(
+        row,
+        spec,
+        drug,
+        model["classifier"].coef_[0],
+    )
+    known_marker_conflict = bool(known_markers) and statistical_verdict == "likely_to_work"
+
+    no_call_reasons: list[str] = []
+    if target_gate["status"] == "unknown":
+        no_call_reasons.append("target_status_unknown")
+    elif target_gate["status"] != "present":
+        no_call_reasons.append("drug_target_absent_or_disrupted")
+    if quality_gate["status"] == "unknown":
+        no_call_reasons.append("quality_status_unknown")
+    elif quality_gate["status"] == "fail":
+        no_call_reasons.append("low_assembly_quality")
+    if ood:
+        no_call_reasons.append("out_of_distribution")
+    if known_marker_conflict:
+        no_call_reasons.append("known_marker_conflicts_with_model")
+    if verdict_probability < float(model["call_threshold"]):
+        no_call_reasons.append("low_confidence")
+    verdict = "no_call" if no_call_reasons else statistical_verdict
+
+    return {
+        "record_schema_version": 1,
+        "drug": drug,
+        "verdict": verdict,
+        "p_fail": round(p_fail, 6),
+        "verdict_probability": round(verdict_probability, 6),
+        "confidence": round(verdict_probability, 6),
+        "calibrated": True,
+        "evidence_tier": tier,
+        "supporting_markers": known_markers,
+        "statistical_features": statistical_features,
+        "target_gate": target_gate,
+        "quality_gate": quality_gate,
+        "ood": {
+            "distance": round(ood_distance, 6),
+            "threshold": round(float(model["ood_threshold"]), 6),
+            "is_out_of_distribution": ood,
+        },
+        "call_threshold": round(float(model["call_threshold"]), 6),
+        "no_call_reason": no_call_reasons[0] if no_call_reasons else None,
+        "no_call_reasons": no_call_reasons,
+        "model_version": bundle["model_version"],
+        "feature_spec_sha256": bundle["feature_spec_sha256"],
+    }
+
+
+def predict_genome(
+    row: Mapping[str, Any],
+    bundle: Mapping[str, Any] | None = None,
+    spec: Mapping[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     bundle = bundle or load_bundle()
-    return [predict_drug(row, bundle, d) for d in SPEC["drugs"]]
+    spec = spec or bundle["feature_spec"]
+    return [predict_drug(row, bundle, drug, spec) for drug in bundle["drugs"]]
+
+
+def main() -> None:
+    args = parse_args()
+    bundle = load_bundle(args.bundle)
+    spec = load_feature_spec(args.spec)
+    features = pd.read_csv(args.features, dtype={"genome_id": str})
+    splits = pd.read_csv(args.splits, dtype={"genome_id": str})
+    held_out = features.merge(splits, on="genome_id", validate="one_to_one")
+    held_out = held_out.loc[held_out["split"] == "test"]
+    if held_out.empty:
+        raise ValueError("No test genomes are available for the demo")
+    if args.genome_id:
+        held_out = held_out.loc[held_out["genome_id"] == args.genome_id]
+        if held_out.empty:
+            raise ValueError(f"Genome {args.genome_id} is not in the test split")
+    row = held_out.iloc[0].to_dict()
+    print(json.dumps({"genome_id": row["genome_id"], "predictions": predict_genome(row, bundle, spec)}, indent=2))
 
 
 if __name__ == "__main__":
-    import pandas as pd
-    feats = pd.read_csv(HERE / "data/manifests/features.csv")
-    b = load_bundle()
-    demo = feats[feats.split == "test"].iloc[0].to_dict()
-    print(f"Demo genome {demo['genome_id']} (held-out cluster {demo['cluster_id']}):")
-    for rec in predict_genome(demo, b):
-        print(json.dumps(rec, indent=2))
+    main()
