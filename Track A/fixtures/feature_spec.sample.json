@@ -1,0 +1,70 @@
+{
+  "_comment": "SAMPLE contract — a Track-A dev stand-in ONLY, so Track A runs standalone before Phase 0 delivers. This is NOT the real spec and is NOT Track A's deliverable: the real feature_spec.json is Phase 0's (the domain expert's) shared artifact and belongs at data/manifests/feature_spec.json. Track A reads that real file when it exists and falls back to this sample when it does not. Every gene/mutation/target below is a plausible K. pneumoniae placeholder for testing shape only.",
+
+  "species": "Klebsiella pneumoniae",
+  "drugs": ["ciprofloxacin", "meropenem", "gentamicin"],
+
+  "annotation_tool": "AMRFinderPlus",
+  "annotation_tool_version": "PLACEHOLDER-pin-at-setup",
+  "database_version": "PLACEHOLDER-pin-at-setup",
+
+  "feature_order": [
+    "gyrA_S83L", "gyrA_D87N", "parC_S80I", "qnrB1", "oqxAB",
+    "blaKPC-2", "blaNDM-1", "blaOXA-48", "ompK36_loss",
+    "aac(3)-IIa", "aac(6')-Ib", "armA", "rmtB",
+    "target__gyrA", "target__parC", "target__ftsI", "target__rrs"
+  ],
+
+  "marker_drug": {
+    "gyrA_S83L": "ciprofloxacin",
+    "gyrA_D87N": "ciprofloxacin",
+    "parC_S80I": "ciprofloxacin",
+    "qnrB1": "ciprofloxacin",
+    "oqxAB": "ciprofloxacin",
+    "blaKPC-2": "meropenem",
+    "blaNDM-1": "meropenem",
+    "blaOXA-48": "meropenem",
+    "ompK36_loss": "meropenem",
+    "aac(3)-IIa": "gentamicin",
+    "aac(6')-Ib": "gentamicin",
+    "armA": "gentamicin",
+    "rmtB": "gentamicin"
+  },
+
+  "marker_types": {
+    "gyrA_S83L": "point",
+    "gyrA_D87N": "point",
+    "parC_S80I": "point",
+    "qnrB1": "gene",
+    "oqxAB": "efflux",
+    "blaKPC-2": "gene",
+    "blaNDM-1": "gene",
+    "blaOXA-48": "gene",
+    "ompK36_loss": "porin",
+    "aac(3)-IIa": "gene",
+    "aac(6')-Ib": "gene",
+    "armA": "gene",
+    "rmtB": "gene"
+  },
+
+  "drug_targets": {
+    "ciprofloxacin": ["gyrA", "parC"],
+    "meropenem": ["ftsI"],
+    "gentamicin": ["rrs"]
+  },
+
+  "marker_aliases": {
+    "OqxA": "oqxAB",
+    "OqxB": "oqxAB",
+    "aac(3)-IId": "aac(3)-IIa"
+  },
+
+  "qc_columns": ["qc_complete", "qc_contigs"],
+  "metadata_columns": ["genome_id", "cluster_id", "split"],
+
+  "column_dtypes": {
+    "marker_and_target": "int8",
+    "qc_complete": "float32",
+    "qc_contigs": "int32"
+  }
+}
