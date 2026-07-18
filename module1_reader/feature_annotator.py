@@ -38,13 +38,13 @@ from pathlib import Path
 from typing import Optional
 
 HERE = Path(__file__).resolve().parents[1]
-TRACK_A = Path(__file__).resolve().parent
+MODULE_DIR = Path(__file__).resolve().parent
 
 # The real contract is Phase 0's shared deliverable and lives here (NOT owned by
 # Track A — we only read it). Until Phase 0 delivers it, we fall back to a sample
-# bundled inside Track A so this module runs standalone.
+# bundled inside this module so it runs standalone.
 SHARED_SPEC_PATH = HERE / "data/manifests/feature_spec.json"
-SAMPLE_SPEC_PATH = TRACK_A / "fixtures/feature_spec.sample.json"
+SAMPLE_SPEC_PATH = MODULE_DIR / "fixtures/feature_spec.sample.json"
 
 
 # --------------------------------------------------------------------------- #
@@ -302,6 +302,6 @@ def get_annotator(name: Optional[str] = None, spec: Optional[dict] = None, **kwa
     if name not in ANNOTATORS:
         raise ValueError(
             f"Unknown annotator backend '{name}'. Available: {list(ANNOTATORS)}. "
-            f"Add your own by registering it in ANNOTATORS (see 'Track A/README.md')."
+            f"Add your own by registering it in ANNOTATORS (see module1_reader/README.md)."
         )
     return ANNOTATORS[name](spec, **kwargs)

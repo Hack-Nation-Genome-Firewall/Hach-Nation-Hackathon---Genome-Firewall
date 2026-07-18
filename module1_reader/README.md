@@ -22,28 +22,25 @@ exists and uses the sample otherwise.
 
 ## Run it
 
-The folder name has a space, so quote it in shell commands:
-
 ```bash
 # single genome via AMRFinderPlus (needs the tool installed)
-python "Track A/build_features.py" --fasta genome.fasta --genome-id G1 \
+python module1_reader/build_features.py --fasta genome.fasta --genome-id G1 \
     --organism Klebsiella_pneumoniae
 
 # single genome from a saved AMRFinderPlus TSV — no tool needed (uses the fixture)
-python "Track A/build_features.py" --genome-id G1 \
-    --backend amrfinderplus --tsv "Track A/fixtures/sample_amrfinder.tsv"
+python module1_reader/build_features.py --genome-id G1 \
+    --backend amrfinderplus --tsv module1_reader/fixtures/sample_amrfinder.tsv
 
 # bring your own precomputed feature table -> features.csv
-# (default output stays inside Track A/out/; point --out at data/manifests/ only at integration)
-python "Track A/build_features.py" --backend precomputed \
-    --table my_features.csv --out "Track A/out/features.csv"
+# (default output stays inside module1_reader/out/; point --out at data/manifests/ only at integration)
+python module1_reader/build_features.py --backend precomputed \
+    --table my_features.csv --out module1_reader/out/features.csv
 ```
 
 At inference the app calls one function:
 
 ```python
-import sys; sys.path.insert(0, "Track A")
-from build_features import run_genome_reader
+from module1_reader.build_features import run_genome_reader
 row = run_genome_reader("genome.fasta", genome_id="G1")   # -> validated feature dict
 ```
 
@@ -53,7 +50,7 @@ Fast, deterministic, no AMRFinderPlus needed (they use the bundled fixtures):
 
 ```bash
 pip install pytest
-pytest "Track A/tests"
+pytest module1_reader/tests
 ```
 
 They lock down the fragile parts: the exact feature-column order (the tripwire for

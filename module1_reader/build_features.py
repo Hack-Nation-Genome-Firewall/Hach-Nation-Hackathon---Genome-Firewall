@@ -8,19 +8,19 @@ Two ways in, both returning rows that already satisfy the frozen feature contrac
 
 Both are backend-agnostic: pass backend="amrfinderplus" (default) to run the tool,
 backend="precomputed" to load an existing table, or your own registered backend.
-See feature_annotator.py for the extension point and "Track A/README.md" for
+See feature_annotator.py for the extension point and module1_reader/README.md for
 how to add a source.
 
-CLI (folder name has a space — quote it):
+CLI:
     # single genome via AMRFinderPlus
-    python "Track A/build_features.py" --fasta genome.fasta --genome-id G1
+    python module1_reader/build_features.py --fasta genome.fasta --genome-id G1
 
     # single genome from a saved AMRFinderPlus TSV (no tool needed)
-    python "Track A/build_features.py" --genome-id G1 \
-        --backend amrfinderplus --tsv "Track A/fixtures/sample_amrfinder.tsv"
+    python module1_reader/build_features.py --genome-id G1 \
+        --backend amrfinderplus --tsv module1_reader/fixtures/sample_amrfinder.tsv
 
     # batch, bringing your own precomputed feature table
-    python "Track A/build_features.py" --backend precomputed \
+    python module1_reader/build_features.py --backend precomputed \
         --table my_features.csv --out data/manifests/features.csv
 """
 from __future__ import annotations
@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Optional
 
 from feature_annotator import (
-    TRACK_A, get_annotator, load_spec, target_columns, ContractError,
+    MODULE_DIR, get_annotator, load_spec, target_columns, ContractError,
 )
 
 
@@ -63,9 +63,9 @@ def build_features_table(genomes: list[dict], *, backend: str = "amrfinderplus",
     """
     spec = spec or load_spec()
     annotator = get_annotator(backend, spec, **backend_kwargs)
-    # Default output stays INSIDE Track A. At integration, pass out_path=
+    # Default output stays INSIDE this module. At integration, pass out_path=
     # "data/manifests/features.csv" so Track B/C consume it from the shared location.
-    out_path = Path(out_path) if out_path else TRACK_A / "out/features.csv"
+    out_path = Path(out_path) if out_path else MODULE_DIR / "out/features.csv"
 
     header = (["genome_id"] + spec["feature_order"] + spec.get("qc_columns", []))
     out_path.parent.mkdir(parents=True, exist_ok=True)

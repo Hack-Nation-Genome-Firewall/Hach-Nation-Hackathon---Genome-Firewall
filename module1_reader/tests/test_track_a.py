@@ -5,7 +5,7 @@ These are the fragile, high-value bits: a silent change to feature order or a ho
 in the validation gate would corrupt Tracks B and C without crashing. Everything
 here is fast and deterministic — it uses the bundled fixtures, never AMRFinderPlus.
 
-Run:  pytest "Track A/tests"
+Run:  pytest module1_reader/tests
 """
 import pytest
 
@@ -16,7 +16,7 @@ from feature_annotator import (
 )
 from build_features import run_genome_reader
 
-FIXTURE_TSV = fa.TRACK_A / "fixtures" / "sample_amrfinder.tsv"
+FIXTURE_TSV = fa.MODULE_DIR / "fixtures" / "sample_amrfinder.tsv"
 
 
 @pytest.fixture
