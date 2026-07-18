@@ -29,6 +29,8 @@ manifest and checksums identify every input without putting gigabytes in Git.
 - Exclude genome/drug pairs with conflicting S/R records.
 - Preserve MIC, testing-standard, method, publication, and source metadata.
 - Apply genome-quality criteria before selection.
+- Prefer genomes with results for more configured drugs, then use a seeded
+  SHA-256 rank to cap the cohort deterministically.
 - Split by a separately computed homology cluster; never randomly split rows.
 
 The current policy is provisional until approved by the domain expert.

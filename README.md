@@ -44,7 +44,22 @@ python -m pip install -r requirements.txt
 python -m pytest
 ```
 
-The data and Track B commands will be documented as their implementations land.
+Build a frozen BV-BRC laboratory-label cohort:
+
+```bash
+python -m data.fetch_bvbrc
+```
+
+This writes committed manifests under `data/manifests/` and keeps large raw
+responses under ignored `data/raw/`. To download selected assembled genomes
+through the BV-BRC HTTPS API:
+
+```bash
+python -m data.download_genomes --workers 4
+```
+
+Use `--limit 5` for a small end-to-end download check. Acquisition refuses to
+overwrite existing raw snapshots unless `--overwrite` is explicitly supplied.
 
 ## Safety boundary
 
