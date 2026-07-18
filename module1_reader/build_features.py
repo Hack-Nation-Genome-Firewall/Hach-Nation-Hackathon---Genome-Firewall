@@ -38,10 +38,15 @@ from feature_annotator import (
 
 def run_genome_reader(fasta: Optional[str] = None, *, genome_id: str = "query",
                       backend: str = "amrfinderplus", spec: Optional[dict] = None,
-                      tsv_override: Optional[str] = None, **backend_kwargs) -> dict:
+                      tsv_override: Optional[str] = None,
+                      unknown_markers_out: Optional[list] = None,
+                      **backend_kwargs) -> dict:
     """
     One genome -> one validated feature row (dict). The function the app calls at
     inference. Guarantees the same column order the models were trained on.
+
+    If `unknown_markers_out` is given, it is extended with any markers the backend
+    reported that are outside the vocabulary (preserved, not dropped).
     """
     spec = spec or load_spec()
     annotator = get_annotator(backend, spec, **backend_kwargs)
@@ -49,8 +54,12 @@ def run_genome_reader(fasta: Optional[str] = None, *, genome_id: str = "query",
     if tsv_override is not None and backend == "amrfinderplus":
         from feature_annotator import validate_feature_row
         raw = annotator.annotate(genome_id, fasta, tsv_override=Path(tsv_override))
-        return validate_feature_row(raw, spec)
-    return annotator.annotate_validated(genome_id, fasta)
+        row = validate_feature_row(raw, spec)
+    else:
+        row = annotator.annotate_validated(genome_id, fasta)
+    if unknown_markers_out is not None:
+        unknown_markers_out.extend(getattr(annotator, "last_unknown_markers", []))
+    return row
 
 
 def build_features_table(genomes: list[dict], *, backend: str = "amrfinderplus",
@@ -61,6 +70,8 @@ def build_features_table(genomes: list[dict], *, backend: str = "amrfinderplus",
 
     `genomes` is a list of {"genome_id": ..., "source": <fasta path or table id>}.
     Writes genome_id + model_features + target columns + QC columns in contract order.
+    Unknown markers (outside the vocabulary) are preserved to an `unknown_markers.csv`
+    sidecar next to the output rather than dropped.
     """
     spec = spec or load_spec()
     annotator = get_annotator(backend, spec, **backend_kwargs)
@@ -71,6 +82,7 @@ def build_features_table(genomes: list[dict], *, backend: str = "amrfinderplus",
     header = (["genome_id"] + marker_columns(spec)
               + target_columns(spec) + quality_columns(spec))
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    unknown_rows: list[tuple[str, str]] = []
     with open(out_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=header)
         writer.writeheader()
@@ -78,6 +90,15 @@ def build_features_table(genomes: list[dict], *, backend: str = "amrfinderplus",
             row = annotator.annotate_validated(g["genome_id"], g.get("source"))
             row["genome_id"] = g["genome_id"]
             writer.writerow(row)
+            for marker in getattr(annotator, "last_unknown_markers", []):
+                unknown_rows.append((g["genome_id"], marker))
+
+    # Preserve unknown markers (Track A guardrail: never silently drop them).
+    unknown_path = out_path.parent / "unknown_markers.csv"
+    with open(unknown_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["genome_id", "unknown_marker"])
+        writer.writerows(unknown_rows)
     return out_path
 
 
@@ -101,10 +122,11 @@ def _main() -> None:
     if args.backend == "amrfinderplus" and args.organism:
         kwargs["organism"] = args.organism
 
+    unknown: list = []
     try:
         row = run_genome_reader(
             args.fasta, genome_id=args.genome_id, backend=args.backend,
-            spec=spec, tsv_override=args.tsv, **kwargs,
+            spec=spec, tsv_override=args.tsv, unknown_markers_out=unknown, **kwargs,
         )
     except ContractError as e:
         p.error(str(e))
@@ -117,6 +139,7 @@ def _main() -> None:
     print(f"targets absent/disrupted: {tgt_absent or 'none'}")
     print(f"QC: completeness={row.get(qf['completeness'])} "
           f"contamination={row.get(qf['contamination'])} contigs={row.get(qf['contigs'])}")
+    print(f"unknown markers (preserved, not in vocab): {unknown or 'none'}")
 
 
 if __name__ == "__main__":

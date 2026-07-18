@@ -61,8 +61,18 @@ pytest module1_reader/tests
 ```
 
 They lock down the fragile parts: the exact feature-column order (the tripwire for
-a silent contract break), TSV parsing + alias mapping, unknown-marker dropping, the
-validation gate's rejections, the precomputed backend, and the spec fallback.
+a silent contract break), TSV parsing + alias mapping, unknown-marker preservation,
+the validation gate's rejections, the precomputed backend, the spec fallback, and
+compatibility with Track B's own contract validators.
+
+## Unknown markers are preserved, not dropped
+
+The model vector is fixed-shape, so a marker AMRFinderPlus reports that isn't in the
+vocabulary can't become a model column — but per the Track A guardrail we never
+silently drop it. Each is recorded: surfaced via `run_genome_reader(...,
+unknown_markers_out=[])`, printed by the CLI, and written to an `unknown_markers.csv`
+sidecar next to `features.csv` in batch runs (`genome_id,unknown_marker`). That keeps
+them available for the domain expert to review and possibly add to the vocabulary.
 
 ## Adding your own annotation source (the door is already open)
 

@@ -12,11 +12,11 @@ import pytest
 
 import feature_annotator as fa
 from feature_annotator import (
-    load_spec, validate_feature_row, parse_amrfinder_tsv, marker_columns,
-    target_columns, quality_columns, get_annotator, PrecomputedAnnotator,
-    ContractError, load_project_config, spec_project_discrepancies,
+    load_spec, validate_feature_row, parse_amrfinder_tsv, parse_amrfinder_markers,
+    marker_columns, target_columns, quality_columns, get_annotator,
+    PrecomputedAnnotator, ContractError, load_project_config, spec_project_discrepancies,
 )
-from build_features import run_genome_reader
+from build_features import run_genome_reader, build_features_table
 
 FIXTURE_TSV = fa.MODULE_DIR / "fixtures" / "sample_amrfinder.tsv"
 
@@ -61,17 +61,44 @@ def test_parse_detects_markers_and_maps_alias(spec):
     assert flags["blaNDM-1"] == 0
 
 
-def test_unknown_symbol_is_dropped_not_added(tmp_path, spec):
+def test_unknown_symbol_is_preserved_not_dropped(tmp_path, spec):
     tsv = tmp_path / "unknown.tsv"
     tsv.write_text(
         "Element symbol\tType\n"
         "blaFOO-999\tAMR\n"        # not in our vocabulary
         "blaKPC-2\tAMR\n"
     )
-    flags = parse_amrfinder_tsv(tsv, spec)
+    flags, unknown = parse_amrfinder_markers(tsv, spec)
+    # the fixed feature vector must not grow a column for the unknown...
     assert set(flags.keys()) == set(marker_columns(spec)), "row shape changed on unknown marker"
     assert flags["blaKPC-2"] == 1
     assert "blaFOO-999" not in flags
+    # ...but the unknown must be PRESERVED for review, not silently dropped
+    assert unknown == ["blaFOO-999"]
+
+
+def test_run_genome_reader_surfaces_unknown_markers(tmp_path, spec):
+    tsv = tmp_path / "u.tsv"
+    tsv.write_text("Element symbol\tType\nblaFOO-999\tAMR\nblaKPC-2\tAMR\n")
+    unknown: list = []
+    run_genome_reader(genome_id="G", backend="amrfinderplus", spec=spec,
+                      tsv_override=tsv, unknown_markers_out=unknown)
+    assert unknown == ["blaFOO-999"]
+
+
+def test_batch_writes_unknown_markers_sidecar(tmp_path, spec):
+    tsv = tmp_path / "u.tsv"
+    tsv.write_text("Element symbol\tType\nblaFOO-999\tAMR\nblaKPC-2\tAMR\n")
+    out = tmp_path / "features.csv"
+    build_features_table(
+        [{"genome_id": "G1", "source": str(tsv)}],
+        backend="amrfinderplus", out_path=out, spec=spec, precomputed_tsv=True,
+    )
+    sidecar = out.parent / "unknown_markers.csv"
+    assert sidecar.exists()
+    text = sidecar.read_text()
+    assert "genome_id,unknown_marker" in text
+    assert "G1,blaFOO-999" in text
 
 
 def test_targets_default_present(spec):

@@ -197,6 +197,9 @@ class FeatureAnnotator(ABC):
 
     def __init__(self, spec: dict):
         self.spec = spec
+        # Markers seen on the most recent annotate() that are outside the vocabulary.
+        # Preserved (not dropped) per the Track A guardrail; batch runs log them.
+        self.last_unknown_markers: list[str] = []
 
     @abstractmethod
     def annotate(self, genome_id: str, source) -> dict:
@@ -221,29 +224,43 @@ class FeatureAnnotator(ABC):
 # --------------------------------------------------------------------------- #
 # Backend 1 (default): AMRFinderPlus
 # --------------------------------------------------------------------------- #
-def parse_amrfinder_tsv(tsv_path: Path, spec: dict) -> dict:
+def parse_amrfinder_markers(tsv_path: Path, spec: dict) -> tuple[dict, list[str]]:
     """
-    Turn an AMRFinderPlus TSV into raw marker flags against our vocabulary.
+    Turn an AMRFinderPlus TSV into (marker flags, unknown markers).
 
     Reads the `Element symbol` column, maps it (directly or via marker_aliases)
-    onto our marker names, and sets those flags to 1. Symbols outside our frozen
-    vocabulary are dropped (with the caller free to log them) so the row shape
-    stays fixed. Kept separate from the subprocess call so it is testable against
-    a saved fixture without AMRFinderPlus installed.
+    onto our vocabulary, and sets those flags to 1. The model feature vector must
+    stay fixed-shape, so a symbol outside the vocabulary can't become a model
+    column — but per the Track A guardrail we do NOT silently drop it: every such
+    symbol is returned in `unknown_markers` (de-duplicated, in order seen) so it is
+    preserved for review and possible addition to the vocabulary. Kept separate
+    from the subprocess call so it is testable against a fixture without the tool.
     """
     vocab = set(marker_columns(spec))
     aliases = spec.get("marker_aliases", {})
     flags = {m: 0 for m in vocab}
+    unknown: list[str] = []
+    seen_unknown: set[str] = set()
 
     with open(tsv_path, newline="") as f:
         reader = csv.DictReader(f, delimiter="\t")
         sym_col = _pick_symbol_column(reader.fieldnames or [])
         for rec in reader:
             symbol = (rec.get(sym_col) or "").strip()
+            if not symbol:
+                continue
             marker = aliases.get(symbol, symbol)
             if marker in vocab:
                 flags[marker] = 1
-    return flags
+            elif symbol not in seen_unknown:
+                seen_unknown.add(symbol)
+                unknown.append(symbol)   # preserve, don't drop
+    return flags, unknown
+
+
+def parse_amrfinder_tsv(tsv_path: Path, spec: dict) -> dict:
+    """Marker flags only (thin wrapper over parse_amrfinder_markers)."""
+    return parse_amrfinder_markers(tsv_path, spec)[0]
 
 
 def _pick_symbol_column(fieldnames: list[str]) -> str:
@@ -270,20 +287,32 @@ class AMRFinderPlusAnnotator(FeatureAnnotator):
     detection (the `target__<gene>` flags) needs a separate gene-presence check
     against the assembly; until that is wired in, targets default to present (1).
     ompK36_loss is likewise a derived "absence" feature, not a direct AMRFinderPlus
-    hit. Both are flagged TODO below rather than faked.
+    hit. Both are flagged TODO below rather than faked. Markers AMRFinderPlus reports
+    that are outside the vocabulary are recorded in `last_unknown_markers`, not dropped.
     """
 
     def __init__(self, spec: dict, organism: Optional[str] = None,
-                 amrfinder_bin: str = "amrfinder", extra_args: Optional[list] = None):
+                 amrfinder_bin: str = "amrfinder", extra_args: Optional[list] = None,
+                 precomputed_tsv: bool = False):
         super().__init__(spec)
         self.organism = organism
         self.amrfinder_bin = amrfinder_bin
         self.extra_args = extra_args or []
+        # When True, `source` is a saved AMRFinderPlus TSV (organizer-precomputed
+        # results) rather than a FASTA — so batch runs never re-run the tool.
+        self.precomputed_tsv = precomputed_tsv
 
     def annotate(self, genome_id: str, source, tsv_override: Optional[Path] = None) -> dict:
         row = self._empty_row()
-        tsv = Path(tsv_override) if tsv_override else self._run(Path(source))
-        row.update(parse_amrfinder_tsv(tsv, self.spec))
+        if tsv_override is not None:
+            tsv = Path(tsv_override)
+        elif self.precomputed_tsv:
+            tsv = Path(source)
+        else:
+            tsv = self._run(Path(source))
+        flags, unknown = parse_amrfinder_markers(tsv, self.spec)
+        row.update(flags)
+        self.last_unknown_markers = unknown   # preserved for review, not dropped
         # TODO(target-presence): replace default-present targets with a real
         #   gene-presence check (e.g. BLAST each drug_targets gene vs the assembly).
         # TODO(qc): fill qc_completeness / qc_contamination / qc_contigs from assembly
