@@ -60,6 +60,16 @@ def validate_feature_spec(spec: Mapping[str, Any]) -> None:
     for drug in drugs:
         if drug not in targets or not targets[drug]:
             raise ValueError(f"No target features are configured for {drug}")
+        if len(targets[drug]) != len(set(targets[drug])):
+            raise ValueError(f"Target features for {drug} must be unique")
+    quality_features = spec["quality_features"]
+    if set(quality_features) != {"completeness", "contamination", "contigs"}:
+        raise ValueError("quality_features must map completeness, contamination, and contigs")
+    quality_policy = spec["quality_policy"]
+    required_quality_policy = {"minimum_completeness", "maximum_contamination", "maximum_contigs"}
+    missing_quality_policy = sorted(required_quality_policy - quality_policy.keys())
+    if missing_quality_policy:
+        raise ValueError(f"quality_policy is missing keys: {missing_quality_policy}")
     evidence = spec["marker_evidence"]
     unknown_markers = sorted(set(evidence) - set(features))
     if unknown_markers:
@@ -92,6 +102,14 @@ def validate_training_frames(
     _require_columns(features, {"genome_id", *spec["model_features"]}, "features")
     _require_columns(labels, {"genome_id", "antibiotic", "phenotype", "evidence"}, "labels")
     _require_columns(splits, {"genome_id", "cluster_id", "split"}, "split manifest")
+    for frame, columns, name in (
+        (features, ["genome_id"], "features"),
+        (labels, ["genome_id", "antibiotic", "phenotype", "evidence"], "labels"),
+        (splits, ["genome_id", "cluster_id", "split"], "split manifest"),
+    ):
+        null_columns = [column for column in columns if frame[column].isna().any()]
+        if null_columns:
+            raise ValueError(f"{name} contains null values in required columns: {null_columns}")
     if features["genome_id"].duplicated().any():
         raise ValueError("Feature matrix contains duplicate genome_id rows")
     if splits["genome_id"].duplicated().any():

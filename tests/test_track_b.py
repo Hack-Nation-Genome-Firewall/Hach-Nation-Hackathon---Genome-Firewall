@@ -47,6 +47,15 @@ def test_nonconforming_label_evidence_is_rejected():
         validate_training_frames(features, invalid, splits, spec)
 
 
+def test_missing_cluster_id_is_rejected():
+    features, labels, splits, spec = build()
+    invalid = splits.copy()
+    invalid.loc[0, "cluster_id"] = pd.NA
+
+    with pytest.raises(ValueError, match="null values"):
+        validate_training_frames(features, labels, invalid, spec)
+
+
 def test_missing_model_feature_is_an_error(trained_fixture):
     features, _labels, _splits, spec, _bundle, _summary = trained_fixture
     row = features.iloc[0].to_dict()
