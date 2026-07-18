@@ -1,6 +1,6 @@
 # Genome Firewall: Team Status and Next Steps
 
-**Status snapshot:** 19 July 2026 (Track C app/eval UI update)
+**Status snapshot:** 19 July 2026 (Track C — FASTA upload wired to Track A reader)
 
 **Repository:** https://github.com/liiandy/Hach-Nation-Hackathon---Genome-Firewall
 
@@ -165,10 +165,20 @@ demo-ready interface:
   rendered as interactive Plotly charts with hover tooltips, plus a held-out
   metrics table. Colours use a validated monochrome-blue ramp (checked with the
   data-viz validator: single hue, monotone lightness, sufficient contrast).
-- **FASTA-upload path wired for Track A.** An "Upload a genome (FASTA)" tab and a
-  `build_feature_row_from_fasta()` seam are in place; today it shows an honest
-  "integration pending" notice, and Track A's genome reader plugs straight in
-  there to make real uploads run end to end.
+- **FASTA-upload path connected to Track A's genome reader.** The
+  `build_feature_row_from_fasta()` seam now calls `module1_reader.run_genome_reader`
+  (pinned to the app's feature spec), and the "Upload a genome (FASTA)" tab drives
+  the full pipeline end to end: FASTA -> Track A reader -> contract-valid feature
+  row -> `predict_genome` -> the same report, rendered for the uploaded genome. No
+  Track A files were modified. It degrades honestly rather than faking a result: if
+  AMRFinderPlus is not installed the tab says so, a tool-free checkbox demonstrates
+  the wiring against Track A's bundled sample annotation (read-only), and an
+  uploaded-genome banner states plainly that the verdicts are a pipeline
+  demonstration, not biology — because the deployed bundle is still the synthetic
+  fixture, real gene names the reader finds (`blaKPC-2`, `gyrA_S83L`, …) are
+  preserved as unknown markers rather than scored. It becomes a real biological
+  result once Phase 0 publishes the shared `feature_spec.json` and Track B trains a
+  bundle on that vocabulary.
 - **Figures ported to the real contract.** `TrackC/make_figures.py` now reads
   `data/synthetic/*` + the joblib bundle (was still on the old
   `data/manifests/feature_spec.json` layout) and regenerates the static
@@ -203,9 +213,13 @@ Streamlit application test (AppTest) executed without exceptions
 5. Mash/Sourmash homology clusters and grouped splits do not exist yet.
 6. Track B has not been trained on real biological features.
 7. There are no real held-out performance or calibration results.
-8. The app does not yet process a real uploaded FASTA through Track A. The
-   upload UI and the `build_feature_row_from_fasta()` seam are ready; they are
-   waiting on Track A's genome reader to fill in.
+8. The app is wired to Track A's genome reader (FASTA -> reader -> feature row ->
+   prediction runs end to end), but a real uploaded FASTA cannot yet yield a
+   biological result: AMRFinderPlus is not installed on the demo host, and the
+   deployed bundle is still the synthetic fixture, so real markers the reader finds
+   are preserved as unknown rather than scored. Unblocked by installing
+   AMRFinderPlus plus Phase 0's shared spec and a real Track B bundle (items 2, 5,
+   6 above).
 9. Attribution, final model card, demo narrative, and final scientific review
    remain incomplete.
 
