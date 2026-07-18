@@ -125,8 +125,11 @@ provably contract-valid.
   present (1) until a real gene-presence check (e.g. BLAST the target gene vs the
   assembly) is wired into `AMRFinderPlusAnnotator.annotate()`.
 - **`ompK36_loss`** is a derived *absence* feature, not a direct AMRFinderPlus hit.
-- **QC columns** (`qc_completeness`, `qc_contamination`, `qc_contigs`): can be read
-  straight from `data/manifests/selected_genomes.csv` (which already has CheckM
-  completeness/contamination + contig count) instead of re-running CheckM.
+- **QC columns** (`qc_completeness`, `qc_contamination`, `qc_contigs`): *done* — read
+  straight from `data/manifests/selected_genomes.csv` (CheckM completeness/contamination
+  + contig count) via `load_qc_map()` / the `--selected-genomes` flag / `qc_source=`.
+  When a genome's QC is unknown, the columns are left **None**, not faked clean, so
+  Track B routes it to no-call (guardrail: a missing QC value must not read as good).
+  A test checks this against Track B's own `_quality_gate` (pass / fail / unknown).
 - **Pin the DB**: record `amrfinder -V` into `feature_spec.json`
   (`annotation_tool_version`, `database_version`) at setup and never update mid-event.

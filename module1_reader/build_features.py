@@ -31,8 +31,8 @@ from pathlib import Path
 from typing import Optional
 
 from feature_annotator import (
-    MODULE_DIR, get_annotator, load_spec, marker_columns, target_columns,
-    quality_columns, ContractError,
+    MODULE_DIR, get_annotator, load_spec, load_qc_map, marker_columns,
+    target_columns, quality_columns, ContractError,
 )
 
 
@@ -110,6 +110,8 @@ def _main() -> None:
     p.add_argument("--tsv", help="use a saved AMRFinderPlus TSV instead of running the tool")
     p.add_argument("--table", help="precomputed feature table (precomputed backend)")
     p.add_argument("--organism", help="AMRFinderPlus --organism, e.g. Klebsiella_pneumoniae")
+    p.add_argument("--selected-genomes",
+                   help="data/manifests/selected_genomes.csv to fill real QC (CheckM)")
     p.add_argument("--out", help="write a features.csv here instead of printing one row")
     args = p.parse_args()
 
@@ -121,6 +123,8 @@ def _main() -> None:
         kwargs["table_path"] = args.table
     if args.backend == "amrfinderplus" and args.organism:
         kwargs["organism"] = args.organism
+    if args.selected_genomes:
+        kwargs["qc_source"] = load_qc_map(args.selected_genomes)
 
     unknown: list = []
     try:
