@@ -30,7 +30,6 @@ AMR_REQUIRED_FIELDS = {
     "id",
     "genome_id",
     "antibiotic",
-    "resistant_phenotype",
     "evidence",
     "taxon_id",
 }
@@ -314,7 +313,8 @@ def clean_amr_records(
         if drug_key not in configured_drugs:
             stats["unconfigured_antibiotic"] += 1
             continue
-        phenotype = str(raw["resistant_phenotype"]).strip()
+        phenotype_value = raw.get("resistant_phenotype")
+        phenotype = "" if phenotype_value is None else str(phenotype_value).strip()
         if phenotype in excluded:
             stats["excluded_phenotype"] += 1
             continue

@@ -59,6 +59,8 @@ def test_clean_amr_records_collapses_duplicates_and_excludes_conflicts(config):
         amr_record("4", "g2", "ciprofloxacin", "Resistant"),
         amr_record("5", "g3", "meropenem", "Intermediate"),
         amr_record("6", "g4", "meropenem", "Susceptible", evidence="Computational Method"),
+        {key: value for key, value in amr_record("7", "g5", "meropenem", "Resistant").items()
+         if key != "resistant_phenotype"},
     ]
 
     clean, conflicts, stats = clean_amr_records(records, config)
@@ -71,6 +73,7 @@ def test_clean_amr_records_collapses_duplicates_and_excludes_conflicts(config):
     assert stats["conflicting_pairs_excluded"] == 1
     assert stats["excluded_phenotype"] == 1
     assert stats["wrong_evidence"] == 1
+    assert stats["invalid_phenotype"] == 1
 
 
 def test_quality_policy_fails_missing_and_out_of_range_values(config):
