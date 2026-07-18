@@ -1,29 +1,115 @@
 """
 GENOME FIREWALL — Module 3: The Decision Report (Streamlit).
 
-Run:  streamlit run module3_app/app.py
+Run:  streamlit run TrackC/app.py
 
-Reference demo on SYNTHETIC data. In production, wire the FASTA uploader to
-Module 1 (AMRFinderPlus) to build the feature row, then call predict_genome().
+Reference demo. Runs on a SYNTHETIC fixture today (disclosed prominently in the
+UI); the FASTA-upload path is wired and waiting for Track A's genome reader
+(AMRFinderPlus -> feature row) — see `build_feature_row_from_fasta` below.
+
+Visual theme: clinical-blue (see .streamlit/config.toml), adapted from the
+"healthcare" theme in github.com/jmedia65/awesome-streamlit-themes.
 """
 import os
 import sys
+from collections import Counter
+from html import escape
 from pathlib import Path
+
 import pandas as pd
 import streamlit as st
 
 HERE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # for local charts.py
 from module2_predictor.contracts import load_feature_spec  # noqa: E402
 from module2_predictor.predict import load_bundle, predict_genome  # noqa: E402
+from charts import performance_figure, reliability_figure  # noqa: E402
+
+
+def _flatten(html_str: str) -> str:
+    """Strip per-line indentation so Streamlit markdown does not treat the HTML
+    as an indented code block (which would render raw <div> tags as text)."""
+    return " ".join(line.strip() for line in html_str.splitlines() if line.strip())
+
 
 SPEC_PATH = Path(os.environ.get("GENOME_FIREWALL_SPEC", HERE / "data/synthetic/feature_spec.json"))
 FEATURES_PATH = Path(os.environ.get("GENOME_FIREWALL_FEATURES", HERE / "data/synthetic/features.csv"))
 SPLITS_PATH = Path(os.environ.get("GENOME_FIREWALL_SPLITS", HERE / "data/synthetic/split_manifest.csv"))
 BUNDLE_PATH = Path(os.environ.get("GENOME_FIREWALL_BUNDLE", HERE / "models/synthetic_bundle.joblib"))
+EVAL_DIR = HERE / "eval"
 SPEC = load_feature_spec(SPEC_PATH)
+IS_SYNTHETIC = bool(SPEC.get("synthetic"))
 
-st.set_page_config(page_title="Genome Firewall", layout="wide")
+st.set_page_config(page_title="Genome Firewall", page_icon="🧬", layout="wide")
+
+# ---------------------------------------------------------------------------
+# Presentation layer — IBM Plex fonts + clinical-blue card system.
+# ---------------------------------------------------------------------------
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap');
+
+    html, body, [class*="css"], .stMarkdown, p, label { font-family:'IBM Plex Sans',-apple-system,sans-serif; }
+    h1,h2,h3,h4 { font-family:'IBM Plex Sans',sans-serif; font-weight:600; letter-spacing:-0.01em; }
+    code,pre,kbd { font-family:'IBM Plex Mono',monospace; }
+    .block-container { padding-top:2rem; padding-bottom:3rem; max-width:1140px; }
+    #MainMenu, footer { visibility:hidden; }
+    [data-testid="stToolbar"], [data-testid="stDecoration"] { display:none; }
+
+    .gf-hero { display:flex; align-items:center; gap:.6rem; margin:.2rem 0 .1rem; }
+    .gf-hero-title { font-size:1.9rem; font-weight:700; color:#1a2b3c; }
+    .gf-hero-sub { color:#5b6b7b; font-size:.95rem; }
+    .gf-tagchip { display:inline-block; background:#e7f0fb; color:#0052a3; font-size:.72rem;
+        font-weight:600; padding:.18rem .55rem; border-radius:1rem; letter-spacing:.02em; margin-right:.25rem; }
+
+    /* Synthetic-mode disclosure ribbon (honest by design) */
+    .gf-ribbon { border:1px solid #cfe0f5; background:linear-gradient(90deg,#eef5fd,#f7fbff);
+        border-left:5px solid #eda100; border-radius:.55rem; padding:.75rem 1rem; margin:.4rem 0 .2rem;
+        color:#33404d; font-size:.9rem; }
+    .gf-ribbon b { color:#8a5a00; }
+
+    /* Decision cards */
+    .gf-card { background:#fff; border:1px solid #e5e9ee; border-left:5px solid #b8c2cc;
+        border-radius:.6rem; padding:1rem 1.15rem; margin-bottom:.85rem; box-shadow:0 1px 2px rgba(30,50,80,.05); }
+    .gf-card.fail { border-left-color:#d64545; }
+    .gf-card.work { border-left-color:#1e9e63; }
+    .gf-card.nocall { border-left-color:#9aa6b2; background:#fbfcfd; }
+    .gf-card-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:.55rem; }
+    .gf-drug { font-size:1.15rem; font-weight:600; color:#1a2b3c; text-transform:capitalize; }
+    .gf-badge { font-size:.74rem; font-weight:700; padding:.24rem .62rem; border-radius:1rem; letter-spacing:.03em; white-space:nowrap; }
+    .gf-badge.fail { background:#fdeaea; color:#b52b2b; }
+    .gf-badge.work { background:#e7f6ed; color:#137a48; }
+    .gf-badge.nocall { background:#eef1f4; color:#5b6b7b; }
+
+    .gf-row { display:flex; gap:1.4rem; align-items:flex-start; flex-wrap:wrap; }
+    .gf-conf { min-width:150px; }
+    .gf-conf-val { font-size:1.5rem; font-weight:700; color:#1a2b3c; font-family:'IBM Plex Mono',monospace; }
+    .gf-conf-lbl { font-size:.72rem; color:#7c8996; margin-top:-.15rem; }
+    .gf-bar { height:6px; background:#eef1f4; border-radius:3px; margin-top:.4rem; overflow:hidden; }
+    .gf-bar > span { display:block; height:100%; border-radius:3px; }
+    .gf-bar > span.fail { background:#d64545; } .gf-bar > span.work { background:#1e9e63; } .gf-bar > span.nocall { background:#9aa6b2; }
+
+    .gf-evi { flex:1; min-width:290px; }
+    /* Evidence-tier pills — visually distinct grades of evidence strength */
+    .gf-tierpill { display:inline-block; font-size:.72rem; font-weight:600; padding:.16rem .5rem;
+        border-radius:.35rem; margin-bottom:.4rem; border:1px solid transparent; }
+    .gf-tierpill.known { background:#e7f6ed; color:#137a48; border-color:#bfe6cf; }
+    .gf-tierpill.stat  { background:#fdf4e3; color:#8a5a00; border-color:#f3e2bf; }
+    .gf-tierpill.none  { background:#eef1f4; color:#5b6b7b; border-color:#dde3ea; }
+    .gf-tierdesc { font-size:.82rem; color:#5b6b7b; margin-bottom:.3rem; }
+    .gf-chip { display:inline-block; background:#f1f3f4; color:#33404d; font-family:'IBM Plex Mono',monospace;
+        font-size:.74rem; padding:.15rem .45rem; border-radius:.35rem; margin:.12rem .28rem .12rem 0; border:1px solid #e5e9ee; }
+    .gf-gate { font-size:.78rem; color:#7c8996; margin-top:.45rem; }
+    .gf-nocall { font-size:.82rem; color:#8a5a00; background:#fdf4e3; border:1px solid #f3e2bf;
+        padding:.4rem .6rem; border-radius:.4rem; margin-top:.5rem; }
+    .gf-reason { display:inline-block; background:#fff; color:#8a5a00; font-size:.72rem; padding:.1rem .4rem;
+        border-radius:.3rem; margin:.15rem .25rem 0 0; border:1px solid #f0dcae; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ---- mandatory safety banner (non-negotiable per brief) ----
 st.error(
@@ -32,43 +118,163 @@ st.error(
     "must never make a treatment decision on its own. Not for clinical use."
 )
 
-st.title("🧬 Genome Firewall")
-st.caption("Defensive decision support: predicts and explains antibiotic resistance "
-           "that already exists. It never designs, modifies, or optimizes an organism.")
-
-if SPEC.get("synthetic"):
-    st.warning(
-        "Synthetic integration fixture: these results test the software only and "
-        "must not be presented as biological performance."
+# ---- synthetic-mode disclosure (prominent, honest) ----
+if IS_SYNTHETIC:
+    st.markdown(
+        _flatten(
+            """
+            <div class="gf-ribbon">
+              <b>🧪 SYNTHETIC INTEGRATION MODE — we are disclosing this openly.</b><br>
+              This demo runs on a <b>synthetic fixture</b>, not real BV-BRC genomes. The
+              <em>machinery</em> is real and reproducible — calibration, the deterministic
+              target gate, no-call abstention, the homology-grouped split and every metric.
+              Only the genomes are stand-ins until Track A's AMRFinderPlus features and the
+              frozen BV-BRC lab labels are wired in. Showing this honestly beats pretending
+              we already have real data.
+            </div>
+            """
+        ),
+        unsafe_allow_html=True,
     )
 
-# ---- coverage statement (honest scope) ----
+# ---- hero header ----
+st.markdown(
+    _flatten(
+        """
+        <div class="gf-hero"><span style="font-size:1.9rem">🧬</span>
+          <span class="gf-hero-title">Genome Firewall</span></div>
+        <div class="gf-hero-sub">Defensive decision support: it predicts and <em>explains</em> antibiotic
+          resistance that already exists — it never designs, modifies, or optimizes an organism.</div>
+        """
+    ),
+    unsafe_allow_html=True,
+)
+st.markdown(
+    '<div style="margin:.4rem 0 .2rem">'
+    '<span class="gf-tagchip">DEFENSIVE BY CONSTRUCTION</span>'
+    '<span class="gf-tagchip">CALIBRATED UNCERTAINTY</span>'
+    '<span class="gf-tagchip">HUMAN OVERSIGHT REQUIRED</span></div>',
+    unsafe_allow_html=True,
+)
+st.write("")
+
+# ---- sidebar: coverage + honest status ----
 with st.sidebar:
     st.header("Coverage")
-    st.write(f"**Species:** *{SPEC['species']}*")
-    st.write("**Antibiotics:** " + ", ".join(SPEC["drugs"]))
-    st.info("Outside this species/antibiotic set the system returns **no-call**.")
+    species = SPEC["species"]
+    species_name = species["name"] if isinstance(species, dict) else species
+    st.markdown(f"**Species**  \n*{species_name}*")
+    st.markdown("**Antibiotics**  \n" + "".join(f"- {d}\n" for d in SPEC["drugs"]))
+    st.info("Outside this species / antibiotic set the system returns **no-call**.")
     st.divider()
-    st.caption(f"Contract status: {SPEC.get('status', 'unspecified')}")
+    if IS_SYNTHETIC:
+        st.warning("**Data mode: SYNTHETIC**\n\nReplace with real BV-BRC + AMRFinderPlus features to go live.")
+    else:
+        st.success("**Data mode: REAL** (BV-BRC lab-measured)")
+    st.caption(f"Contract status: `{SPEC.get('status', 'unspecified')}`")
 
-VERDICT_STYLE = {
-    "likely_to_fail": ("🔴 Likely to FAIL", "The antibiotic is predicted NOT to work."),
-    "likely_to_work": ("🟢 Likely to WORK", "The antibiotic is predicted to work."),
-    "no_call":        ("⚪ NO-CALL", "Evidence too weak / conflicting / out-of-distribution."),
+VERDICT_META = {
+    "likely_to_fail": ("fail", "● LIKELY TO FAIL"),
+    "likely_to_work": ("work", "● LIKELY TO WORK"),
+    "no_call":        ("nocall", "● NO-CALL"),
 }
-TIER_LABEL = {
-    "known_marker": "🧬 Known resistance gene / DNA change detected",
-    "statistical_only": "📊 Statistical association only (NOT proof of biological cause)",
-    "no_signal": "— No known resistance signal found",
+TIER_META = {
+    "known_marker":     ("known", "🧬 KNOWN RESISTANCE MARKER",
+                         "A known resistance gene / DNA change was detected — the strongest evidence tier."),
+    "statistical_only": ("stat", "📊 STATISTICAL ASSOCIATION ONLY",
+                         "Model association only — <b>not</b> proof of a biological mechanism. Treat with care."),
+    "no_signal":        ("none", "— NO KNOWN SIGNAL",
+                         "No known resistance signal was found for this drug."),
+}
+REASON_LABEL = {
+    "drug_target_absent_or_disrupted": "drug target absent / disrupted",
+    "target_status_unknown": "target status unknown",
+    "low_assembly_quality": "low assembly quality",
+    "quality_status_unknown": "quality status unknown",
+    "out_of_distribution": "out-of-distribution genome",
+    "known_marker_conflicts_with_model": "known marker conflicts with model",
+    "low_confidence": "confidence below call threshold",
 }
 
+
+def render_card(rec: dict) -> str:
+    cls, badge = VERDICT_META[rec["verdict"]]
+    conf = int(round(rec["confidence"] * 100))
+    tcls, tlabel, tdesc = TIER_META[rec["evidence_tier"]]
+    markers = "".join(
+        f'<span class="gf-chip">{escape(m["marker"])} · {escape(str(m.get("type", "")))}</span>'
+        for m in rec["supporting_markers"]
+    )
+    markers_block = f"<div>{markers}</div>" if markers else ""
+    gate = rec["target_gate"]
+    gate_txt = (f'Target gate: {escape(", ".join(gate["target_features"]))} — '
+                f'{escape(gate["status"].replace("_", " "))} → {escape(gate["action"])}')
+    reasons = rec.get("no_call_reasons") or ([rec["no_call_reason"]] if rec.get("no_call_reason") else [])
+    nocall = ""
+    if reasons:
+        chips = "".join(f'<span class="gf-reason">{escape(REASON_LABEL.get(r, r))}</span>' for r in reasons)
+        nocall = (f'<div class="gf-nocall"><b>Why no-call:</b> not enough trustworthy evidence '
+                  f'to make a call.<br>{chips}</div>')
+    card = f"""
+    <div class="gf-card {cls}">
+      <div class="gf-card-head">
+        <span class="gf-drug">{escape(rec["drug"])}</span>
+        <span class="gf-badge {cls}">{badge}</span>
+      </div>
+      <div class="gf-row">
+        <div class="gf-conf">
+          <div class="gf-conf-val">{conf}%</div>
+          <div class="gf-conf-lbl">confidence · calibrated P(fail)={rec["p_fail"]:.3f}</div>
+          <div class="gf-bar"><span class="{cls}" style="width:{conf}%"></span></div>
+        </div>
+        <div class="gf-evi">
+          <span class="gf-tierpill {tcls}">{tlabel}</span>
+          <div class="gf-tierdesc">{tdesc}</div>
+          {markers_block}
+          <div class="gf-gate">{gate_txt}</div>
+          {nocall}
+        </div>
+      </div>
+    </div>
+    """
+    return _flatten(card)
+
+
+def build_feature_row_from_fasta(fasta_bytes: bytes) -> dict:
+    """SEAM for Track A. A genome FASTA -> the feature-contract row the model
+    consumes. Track A's genome reader (AMRFinderPlus -> marker/target/QC flags,
+    in `feature_spec.model_features` order) plugs in here. Until then this raises
+    so the UI shows an honest 'integration pending' notice instead of faking it."""
+    raise NotImplementedError(
+        "Track A genome reader (module1_reader.run_genome_reader) is not wired yet."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Input: demo held-out genome  OR  upload a FASTA (ready for Track A).
+# ---------------------------------------------------------------------------
 feats = pd.read_csv(FEATURES_PATH, dtype={"genome_id": str})
 splits = pd.read_csv(SPLITS_PATH, dtype={"genome_id": str, "cluster_id": str})
 held = feats.merge(splits, on="genome_id", validate="one_to_one")
 held = held[held.split == "test"]
-gid = st.selectbox("Choose a held-out demo genome (or wire the FASTA uploader to Module 1):",
-                   held.genome_id.tolist())
-row = held[held.genome_id == gid].iloc[0].to_dict()
+
+tab_demo, tab_upload = st.tabs(["🧬 Demo genome (held-out)", "📤 Upload a genome (FASTA)"])
+with tab_demo:
+    gid = st.selectbox("Held-out demo genome:", held.genome_id.tolist())
+    row = held[held.genome_id == gid].iloc[0].to_dict()
+with tab_upload:
+    up = st.file_uploader("Assembled genome — FASTA (.fasta / .fa / .fna)",
+                          type=["fasta", "fa", "fna"])
+    st.caption("This path runs the real genome → features → prediction pipeline once "
+               "Track A's AMRFinderPlus reader is connected.")
+    if up is not None:
+        try:
+            _ = build_feature_row_from_fasta(up.getvalue())
+        except NotImplementedError:
+            st.info(f"✅ Received **{up.name}** ({up.size/1000:.0f} kB). "
+                    "Track A's genome reader (`module1_reader.run_genome_reader`) plugs in "
+                    "at `build_feature_row_from_fasta()` — it will build the feature row and "
+                    "the same report below will render. Using the demo genome for now.")
 
 if not BUNDLE_PATH.exists():
     st.error("Model bundle is missing. Run `python -m module2_predictor.train` first.")
@@ -76,36 +282,52 @@ if not BUNDLE_PATH.exists():
 bundle = load_bundle(BUNDLE_PATH)
 recs = predict_genome(row, bundle, SPEC)
 
-st.subheader(f"Antibiotic-response report — genome `{gid}`")
-for rec in recs:
-    head, expl = VERDICT_STYLE[rec["verdict"]]
-    with st.container(border=True):
-        c1, c2, c3 = st.columns([2, 1, 3])
-        c1.markdown(f"### {rec['drug']}")
-        c1.markdown(f"**{head}**")
-        c2.metric("Confidence", f"{rec['confidence']*100:.0f}%")
-        c2.caption(f"Calibrated P(fail)={rec['p_fail']}")
-        c3.markdown(f"**Evidence:** {TIER_LABEL[rec['evidence_tier']]}")
-        if rec["supporting_markers"]:
-            c3.markdown("**Supporting markers:** " +
-                        ", ".join(f"`{m['marker']}` ({m['type']})" for m in rec["supporting_markers"]))
-        gate = rec["target_gate"]
-        target_status = gate["status"].replace("_", " ")
-        c3.caption(f"Target gate: {', '.join(gate['target_features'])} — "
-                   f"{target_status} → {gate['action']}")
-        if rec["no_call_reason"]:
-            c3.warning(f"No-call reason: {rec['no_call_reason']}")
+# ---- summary strip ----
+counts = Counter(r["verdict"] for r in recs)
+st.subheader(f"Antibiotic-response report — `{gid}`")
+m1, m2, m3, m4 = st.columns(4)
+m1.metric("Antibiotics", len(recs))
+m2.metric("Likely to work", counts.get("likely_to_work", 0))
+m3.metric("Likely to fail", counts.get("likely_to_fail", 0))
+m4.metric("No-call", counts.get("no_call", 0))
+st.write("")
+st.markdown("".join(render_card(r) for r in recs), unsafe_allow_html=True)
 
-with st.expander("Why you can trust the *uncertainty* (calibration & generalization)"):
-    st.write("- Models evaluated on a **homology-grouped** held-out split "
-             "(near-identical genomes never span train/test).")
-    st.write("- Confidence scores are **isotonic-calibrated**; see reliability plots in `eval/`.")
-    st.write("- **No-call** is returned for weak, conflicting, or out-of-distribution evidence.")
-    reliability = HERE / "eval/fig_reliability.png"
-    if reliability.exists():
-        st.image(str(reliability))
-    else:
-        st.caption("Reliability figure has not been generated for this bundle.")
+# ---------------------------------------------------------------------------
+# Held-out performance (interactive) + metrics table.
+# ---------------------------------------------------------------------------
+st.divider()
+st.subheader("Held-out performance & calibration")
+st.caption("Evaluated on a **homology-grouped** test split — near-identical genomes never "
+           "span train/test, so these numbers are not inflated by leakage.")
+
+overall_path = EVAL_DIR / "overall_metrics.csv"
+pred_path = EVAL_DIR / "held_out_predictions.csv"
+if overall_path.exists():
+    odf = pd.read_csv(overall_path)
+    st.plotly_chart(performance_figure(odf), use_container_width=True,
+                    theme=None, config={"displayModeBar": False})
+    show = ["drug", "n", "balanced_accuracy", "recall_resistant", "recall_susceptible",
+            "auroc", "pr_auc", "brier", "no_call_rate"]
+    show = [c for c in show if c in odf.columns]
+    st.dataframe(
+        odf[show].rename(columns={
+            "balanced_accuracy": "bal_acc", "recall_resistant": "recall_R",
+            "recall_susceptible": "recall_S", "no_call_rate": "no_call"}),
+        use_container_width=True, hide_index=True,
+    )
+else:
+    st.caption("Run `python -m module2_predictor.evaluate` to populate performance metrics.")
+
+if pred_path.exists():
+    with st.expander("Calibration reliability — predicted vs. observed (interactive)", expanded=True):
+        st.caption("Perfect calibration follows the dotted diagonal. Hover any point for the "
+                   "predicted probability vs. the observed resistant fraction in that bin.")
+        pdf = pd.read_csv(pred_path)
+        st.plotly_chart(reliability_figure(pdf, SPEC["drugs"]), use_container_width=True,
+                        theme=None, config={"displayModeBar": False})
+else:
+    st.caption("Run `python -m module2_predictor.evaluate` to populate the reliability curves.")
 
 st.divider()
 st.caption("Human oversight required: a trained healthcare or laboratory professional "
