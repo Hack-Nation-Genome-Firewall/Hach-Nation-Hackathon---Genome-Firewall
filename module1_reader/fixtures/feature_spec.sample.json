@@ -1,0 +1,57 @@
+{
+  "_comment": "SAMPLE contract — a Track-A dev stand-in ONLY, so this module runs standalone before Phase 0 delivers the real spec. It follows the SAME schema Track B enforces (module2_predictor/contracts.py: schema_version, species, drugs, model_features, marker_evidence, drug_targets, quality_features, quality_policy, expected_label_evidence) and is validated against it in the tests. Every marker/target below is a plausible K. pneumoniae placeholder for testing shape only; the domain expert must approve real marker->drug and target definitions.",
+
+  "schema_version": 1,
+  "species": { "name": "Klebsiella pneumoniae", "taxon_id": 573 },
+  "drugs": ["meropenem", "ciprofloxacin", "gentamicin", "ceftazidime"],
+  "expected_label_evidence": "Laboratory Method",
+
+  "model_features": [
+    "blaKPC-2", "blaNDM-1", "blaOXA-48", "ompK36_loss",
+    "gyrA_S83L", "gyrA_D87N", "parC_S80I", "qnrB1", "oqxAB",
+    "aac(3)-IIa", "aac(6')-Ib", "armA", "rmtB",
+    "blaCTX-M-15", "blaSHV-12"
+  ],
+
+  "marker_evidence": {
+    "blaKPC-2":    { "type": "gene",   "drugs": ["meropenem"],     "source": "NCBI Reference Gene Catalog", "amrfinder_method": "EXACTX" },
+    "blaNDM-1":    { "type": "gene",   "drugs": ["meropenem"],     "source": "NCBI Reference Gene Catalog", "amrfinder_method": "EXACTX" },
+    "blaOXA-48":   { "type": "gene",   "drugs": ["meropenem"],     "source": "NCBI Reference Gene Catalog", "amrfinder_method": "BLASTX" },
+    "ompK36_loss": { "type": "porin",  "drugs": ["meropenem"],     "source": "derived: porin absence/truncation", "amrfinder_method": "DERIVED" },
+    "gyrA_S83L":   { "type": "point",  "drugs": ["ciprofloxacin"], "source": "NCBI Reference Gene Catalog", "amrfinder_method": "POINTX" },
+    "gyrA_D87N":   { "type": "point",  "drugs": ["ciprofloxacin"], "source": "NCBI Reference Gene Catalog", "amrfinder_method": "POINTX" },
+    "parC_S80I":   { "type": "point",  "drugs": ["ciprofloxacin"], "source": "NCBI Reference Gene Catalog", "amrfinder_method": "POINTX" },
+    "qnrB1":       { "type": "gene",   "drugs": ["ciprofloxacin"], "source": "NCBI Reference Gene Catalog", "amrfinder_method": "EXACTX" },
+    "oqxAB":       { "type": "efflux", "drugs": ["ciprofloxacin"], "source": "NCBI Reference Gene Catalog", "amrfinder_method": "BLASTX" },
+    "aac(3)-IIa":  { "type": "gene",   "drugs": ["gentamicin"],    "source": "NCBI Reference Gene Catalog", "amrfinder_method": "EXACTX" },
+    "aac(6')-Ib":  { "type": "gene",   "drugs": ["gentamicin"],    "source": "NCBI Reference Gene Catalog", "amrfinder_method": "EXACTX" },
+    "armA":        { "type": "gene",   "drugs": ["gentamicin"],    "source": "NCBI Reference Gene Catalog", "amrfinder_method": "EXACTX" },
+    "rmtB":        { "type": "gene",   "drugs": ["gentamicin"],    "source": "NCBI Reference Gene Catalog", "amrfinder_method": "EXACTX" },
+    "blaCTX-M-15": { "type": "gene",   "drugs": ["ceftazidime"],   "source": "NCBI Reference Gene Catalog", "amrfinder_method": "EXACTX" },
+    "blaSHV-12":   { "type": "gene",   "drugs": ["ceftazidime"],   "source": "NCBI Reference Gene Catalog", "amrfinder_method": "EXACTX" }
+  },
+
+  "drug_targets": {
+    "meropenem":     ["target__ftsI"],
+    "ciprofloxacin": ["target__gyrA", "target__parC"],
+    "gentamicin":    ["target__rrs"],
+    "ceftazidime":   ["target__ftsI"]
+  },
+
+  "quality_features": {
+    "completeness": "qc_completeness",
+    "contamination": "qc_contamination",
+    "contigs": "qc_contigs"
+  },
+  "quality_policy": {
+    "minimum_completeness": 90.0,
+    "maximum_contamination": 5.0,
+    "maximum_contigs": 500
+  },
+
+  "marker_aliases": {
+    "OqxA": "oqxAB",
+    "OqxB": "oqxAB",
+    "aac(3)-IId": "aac(3)-IIa"
+  }
+}
