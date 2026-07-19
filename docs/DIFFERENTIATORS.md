@@ -14,7 +14,8 @@ strains. A **temporal** split proves something a deployment actually needs: that
 a model trained on *today's* isolates still works on *next year's*.
 
 - **Train:** isolates collected **2001–2014** (1,782 genomes)
-- **Calibration:** a grouped 15% holdout of the same pre-2015 period (221)
+- **Calibration:** a grouped holdout of 15% of the pre-2015 *clusters*
+  (realized as 221 genomes, 11% of the pre-2015 pool)
 - **Test:** isolates collected **2015–2018** (813 genomes)
 - Collection years pulled from BV-BRC (`collection_year` / parsed
   `collection_date`; 94% of the cohort has a usable year).
