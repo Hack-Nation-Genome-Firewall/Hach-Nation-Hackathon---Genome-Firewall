@@ -50,6 +50,8 @@
   },
 
   "marker_aliases": {
+    "oqxA": "oqxAB",
+    "oqxB": "oqxAB",
     "OqxA": "oqxAB",
     "OqxB": "oqxAB",
     "aac(3)-IId": "aac(3)-IIa"

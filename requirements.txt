@@ -1,9 +1,15 @@
 joblib==1.5.3
 matplotlib==3.10.8
-numpy==2.4.4
-pandas==2.2.3
+numpy==2.4.6
+pandas==2.3.3
 plotly==6.6.0
+# pyarrow 25.x segfaults (SIGSEGV) when st.dataframe re-serializes a string
+# column on rerun (macOS/arm64), crashing the whole app on any interaction.
+# 18.1.0 is stable with streamlit 1.45. Do not bump without re-testing reruns.
+pyarrow==18.1.0
 pytest==8.3.4
 requests==2.32.3
-scikit-learn==1.8.0
+scikit-learn==1.9.0
 streamlit==1.45.1
+openai==1.59.6
+fpdf2==2.8.7

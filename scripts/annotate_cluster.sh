@@ -6,6 +6,9 @@
 # each assembly (download -> annotate -> delete) so peak disk stays small.
 # Resumable: re-running skips genomes already annotated.
 #
+# Self-contained: if conda is not on PATH (e.g. a Nix cluster like Swift) it
+# bootstraps a private Miniconda into $HOME/miniconda3 automatically.
+#
 # TWO WAYS TO RUN
 #   Plain (interactive node / login shell with many cores):
 #       bash scripts/annotate_cluster.sh
@@ -13,15 +16,19 @@
 #       sbatch scripts/annotate_cluster.sh
 #
 # The SBATCH lines below are read only by `sbatch`; `bash` ignores them.
-# Edit --partition / --cpus-per-task to match your cluster (see the core-check
-# commands in the message that accompanies this script).
+# Partition/cpus are preset for Swift's `newcpu`; change if your cluster differs.
+#
+# NOTE ON INTERNET: this streams FASTA downloads from BV-BRC while it runs, so
+# the executing node needs outbound internet. If your COMPUTE nodes are
+# firewalled, run this on an internet-facing login/interactive node (bash …)
+# instead of via sbatch, or pre-download the FASTAs first.
 # =============================================================================
 #SBATCH --job-name=gf-amrfinder
 #SBATCH --output=gf-amrfinder-%j.log
-#SBATCH --cpus-per-task=16
-#SBATCH --mem=16G
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=32G
 #SBATCH --time=12:00:00
-# #SBATCH --partition=CHANGE_ME     # uncomment + set to your partition
+#SBATCH --partition=newcpu
 
 set -euo pipefail
 
@@ -36,15 +43,41 @@ ENV_NAME="${ENV_NAME:-amrfinder}"
 
 echo "[gf] repo=$REPO_DIR  ids=$IDS  workers=$WORKERS x ${AMR_THREADS} threads"
 
-# ---- 1. conda env with AMRFinderPlus ---------------------------------------
+# ---- 1. conda (bootstrap Miniconda if absent) ------------------------------
 if ! command -v conda >/dev/null 2>&1; then
-  echo "[gf] ERROR: conda not found. module load anaconda/miniconda, or install miniconda." >&2
-  exit 1
+  CONDA_HOME="${CONDA_HOME:-$HOME/miniconda3}"
+  if [ ! -x "$CONDA_HOME/bin/conda" ]; then
+    echo "[gf] conda not found — bootstrapping Miniconda into $CONDA_HOME…"
+    OS="$(uname -s)"; ARCH="$(uname -m)"
+    case "$OS-$ARCH" in
+      Linux-x86_64)  MC="Miniconda3-latest-Linux-x86_64.sh" ;;
+      Linux-aarch64) MC="Miniconda3-latest-Linux-aarch64.sh" ;;
+      *) echo "[gf] ERROR: unsupported platform $OS-$ARCH; install conda manually." >&2; exit 1 ;;
+    esac
+    curl -fsSL "https://repo.anaconda.com/miniconda/$MC" -o /tmp/miniconda_$$.sh
+    bash /tmp/miniconda_$$.sh -b -p "$CONDA_HOME"
+    rm -f /tmp/miniconda_$$.sh
+  fi
+  export PATH="$CONDA_HOME/bin:$PATH"
 fi
 source "$(conda info --base)/etc/profile.d/conda.sh"
+
+# Recent Miniconda blocks `conda create` on the Anaconda default channels until
+# their Terms of Service are accepted. We use only conda-forge + bioconda (no ToS
+# gate) via --override-channels, and disable the default channels so nothing
+# touches them. The `conda tos accept` calls are a belt-and-braces fallback for
+# conda builds that still probe defaults; guarded so older conda (no `tos`
+# subcommand) doesn't abort the script.
+conda config --system --set channel_priority strict 2>/dev/null || true
+conda config --remove channels defaults 2>/dev/null || true
+conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main 2>/dev/null || true
+conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r    2>/dev/null || true
+
+# ---- 2. AMRFinderPlus env --------------------------------------------------
 if ! conda env list | grep -qw "$ENV_NAME"; then
   echo "[gf] creating conda env '$ENV_NAME' (ncbi-amrfinderplus)…"
-  conda create -y -n "$ENV_NAME" -c conda-forge -c bioconda ncbi-amrfinderplus
+  conda create -y -n "$ENV_NAME" --override-channels -c conda-forge -c bioconda \
+      ncbi-amrfinderplus pandas
 fi
 conda activate "$ENV_NAME"
 python -m pip install --quiet pandas 2>/dev/null || true

@@ -1,0 +1,257 @@
+{
+  "annotation": {
+    "command": "amrfinder -n {fasta} --organism Klebsiella_pneumoniae --plus",
+    "db_version": "2026-05-15.1",
+    "tool": "AMRFinderPlus",
+    "tool_version": "4.2.7"
+  },
+  "drug_targets": {
+    "ceftazidime": [
+      "target__ftsI"
+    ],
+    "ciprofloxacin": [
+      "target__gyrA",
+      "target__parC"
+    ],
+    "gentamicin": [
+      "target__rpsL"
+    ],
+    "meropenem": [
+      "target__ftsI",
+      "target__mrdA"
+    ]
+  },
+  "drugs": [
+    "meropenem",
+    "ciprofloxacin",
+    "gentamicin",
+    "ceftazidime"
+  ],
+  "expected_label_evidence": "Laboratory Method",
+  "marker_evidence": {
+    "marker__aac3": {
+      "amrfinder_method": "EXACTX",
+      "drugs": [
+        "gentamicin"
+      ],
+      "source": "AMRFinderPlus --plus, family-collapsed; NCBI Reference Gene Catalog",
+      "type": "acquired_gene"
+    },
+    "marker__aac6_Ib": {
+      "amrfinder_method": "ALLELEX",
+      "drugs": [
+        "ciprofloxacin",
+        "gentamicin"
+      ],
+      "source": "AMRFinderPlus --plus, family-collapsed; NCBI Reference Gene Catalog",
+      "type": "acquired_gene"
+    },
+    "marker__aadA": {
+      "amrfinder_method": "EXACTX",
+      "drugs": [
+        "gentamicin"
+      ],
+      "source": "AMRFinderPlus --plus, family-collapsed; NCBI Reference Gene Catalog",
+      "type": "acquired_gene"
+    },
+    "marker__aph3": {
+      "amrfinder_method": "EXACTX",
+      "drugs": [
+        "gentamicin"
+      ],
+      "source": "AMRFinderPlus --plus, family-collapsed; NCBI Reference Gene Catalog",
+      "type": "acquired_gene"
+    },
+    "marker__aph6": {
+      "amrfinder_method": "EXACTX",
+      "drugs": [
+        "gentamicin"
+      ],
+      "source": "AMRFinderPlus --plus, family-collapsed; NCBI Reference Gene Catalog",
+      "type": "acquired_gene"
+    },
+    "marker__armA": {
+      "amrfinder_method": "EXACTX",
+      "drugs": [
+        "gentamicin"
+      ],
+      "source": "AMRFinderPlus --plus, family-collapsed; NCBI Reference Gene Catalog",
+      "type": "acquired_gene"
+    },
+    "marker__blaCTX-M": {
+      "amrfinder_method": "ALLELEX",
+      "drugs": [
+        "ceftazidime",
+        "meropenem"
+      ],
+      "source": "AMRFinderPlus --plus, family-collapsed; NCBI Reference Gene Catalog",
+      "type": "acquired_gene"
+    },
+    "marker__blaKPC": {
+      "amrfinder_method": "ALLELEX",
+      "drugs": [
+        "ceftazidime",
+        "meropenem"
+      ],
+      "source": "AMRFinderPlus --plus, family-collapsed; NCBI Reference Gene Catalog",
+      "type": "acquired_gene"
+    },
+    "marker__blaNDM": {
+      "amrfinder_method": "ALLELEX",
+      "drugs": [
+        "ceftazidime",
+        "meropenem"
+      ],
+      "source": "AMRFinderPlus --plus, family-collapsed; NCBI Reference Gene Catalog",
+      "type": "acquired_gene"
+    },
+    "marker__blaOXA": {
+      "amrfinder_method": "ALLELEX",
+      "drugs": [
+        "ceftazidime",
+        "meropenem"
+      ],
+      "source": "AMRFinderPlus --plus, family-collapsed; NCBI Reference Gene Catalog",
+      "type": "acquired_gene"
+    },
+    "marker__blaSHV": {
+      "amrfinder_method": "ALLELEX",
+      "drugs": [
+        "ceftazidime",
+        "meropenem"
+      ],
+      "source": "AMRFinderPlus --plus, family-collapsed; NCBI Reference Gene Catalog",
+      "type": "point_mutation"
+    },
+    "marker__blaTEM": {
+      "amrfinder_method": "ALLELEX",
+      "drugs": [
+        "ceftazidime",
+        "meropenem"
+      ],
+      "source": "AMRFinderPlus --plus, family-collapsed; NCBI Reference Gene Catalog",
+      "type": "acquired_gene"
+    },
+    "marker__gyrA_D87": {
+      "amrfinder_method": "POINTX",
+      "drugs": [
+        "ciprofloxacin"
+      ],
+      "source": "AMRFinderPlus --plus, family-collapsed; NCBI Reference Gene Catalog",
+      "type": "point_mutation"
+    },
+    "marker__gyrA_S83": {
+      "amrfinder_method": "POINTX",
+      "drugs": [
+        "ciprofloxacin"
+      ],
+      "source": "AMRFinderPlus --plus, family-collapsed; NCBI Reference Gene Catalog",
+      "type": "point_mutation"
+    },
+    "marker__ompK35_loss": {
+      "amrfinder_method": "POINTX",
+      "drugs": [
+        "ceftazidime",
+        "meropenem"
+      ],
+      "source": "AMRFinderPlus --plus, family-collapsed; NCBI Reference Gene Catalog",
+      "type": "point_mutation"
+    },
+    "marker__ompK36_loss": {
+      "amrfinder_method": "POINTX",
+      "drugs": [
+        "ceftazidime",
+        "meropenem"
+      ],
+      "source": "AMRFinderPlus --plus, family-collapsed; NCBI Reference Gene Catalog",
+      "type": "point_mutation"
+    },
+    "marker__oqxAB": {
+      "amrfinder_method": "EXACTX",
+      "drugs": [
+        "ciprofloxacin"
+      ],
+      "source": "AMRFinderPlus --plus, family-collapsed; NCBI Reference Gene Catalog",
+      "type": "point_mutation"
+    },
+    "marker__parC_E84": {
+      "amrfinder_method": "POINTX",
+      "drugs": [
+        "ciprofloxacin"
+      ],
+      "source": "AMRFinderPlus --plus, family-collapsed; NCBI Reference Gene Catalog",
+      "type": "point_mutation"
+    },
+    "marker__parC_S80": {
+      "amrfinder_method": "POINTX",
+      "drugs": [
+        "ciprofloxacin"
+      ],
+      "source": "AMRFinderPlus --plus, family-collapsed; NCBI Reference Gene Catalog",
+      "type": "point_mutation"
+    },
+    "marker__qnrB": {
+      "amrfinder_method": "ALLELEX",
+      "drugs": [
+        "ciprofloxacin"
+      ],
+      "source": "AMRFinderPlus --plus, family-collapsed; NCBI Reference Gene Catalog",
+      "type": "acquired_gene"
+    },
+    "marker__qnrS": {
+      "amrfinder_method": "ALLELEX",
+      "drugs": [
+        "ciprofloxacin"
+      ],
+      "source": "AMRFinderPlus --plus, family-collapsed; NCBI Reference Gene Catalog",
+      "type": "acquired_gene"
+    }
+  },
+  "model_features": [
+    "marker__aac3",
+    "marker__aac6_Ib",
+    "marker__aadA",
+    "marker__aph3",
+    "marker__aph6",
+    "marker__armA",
+    "marker__blaCTX-M",
+    "marker__blaKPC",
+    "marker__blaNDM",
+    "marker__blaOXA",
+    "marker__blaSHV",
+    "marker__blaTEM",
+    "marker__gyrA_D87",
+    "marker__gyrA_S83",
+    "marker__ompK35_loss",
+    "marker__ompK36_loss",
+    "marker__oqxAB",
+    "marker__parC_E84",
+    "marker__parC_S80",
+    "marker__qnrB",
+    "marker__qnrS"
+  ],
+  "quality_features": {
+    "completeness": "qc_completeness",
+    "contamination": "qc_contamination",
+    "contigs": "qc_contigs"
+  },
+  "quality_policy": {
+    "maximum_contamination": 5.0,
+    "maximum_contigs": 500,
+    "minimum_completeness": 90.0
+  },
+  "schema_version": 1,
+  "species": {
+    "name": "Klebsiella pneumoniae",
+    "taxon_id": 573
+  },
+  "status": "real_pending_domain_review",
+  "vocabulary_provenance": {
+    "excluded_constant_genes": [],
+    "n_genomes": 2997,
+    "prevalence_band": [
+      0.03,
+      0.97
+    ]
+  }
+}
