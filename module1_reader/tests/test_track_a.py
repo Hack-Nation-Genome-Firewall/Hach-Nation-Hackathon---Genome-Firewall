@@ -61,6 +61,16 @@ def test_parse_detects_markers_and_maps_alias(spec):
     assert flags["blaNDM-1"] == 0
 
 
+def test_lowercase_oqx_maps_to_oqxab(tmp_path, spec):
+    # AMRFinderPlus 4.2.7 emits lowercase oqxA/oqxB; they must map to oqxAB and
+    # NOT land in unknowns (regression for the alias-case bug found in the pilot).
+    tsv = tmp_path / "oqx.tsv"
+    tsv.write_text("Element symbol\tType\noqxA\tAMR\noqxB\tAMR\n")
+    flags, unknown = parse_amrfinder_markers(tsv, spec)
+    assert flags["oqxAB"] == 1
+    assert "oqxA" not in unknown and "oqxB" not in unknown
+
+
 def test_unknown_symbol_is_preserved_not_dropped(tmp_path, spec):
     tsv = tmp_path / "unknown.tsv"
     tsv.write_text(
