@@ -62,7 +62,7 @@ classifier.**
 |---|---|---|---|
 | **ResFinder, CARD, AMRFinderPlus** | rule-based presence/absence of known genes | binary R/S (often by drug *class*) | no calibrated probability, no abstention; balanced accuracy 0.52–0.66 on clinical isolates, varies wildly by drug |
 | **Pathogenwatch, Kleborate** | curated species-specific rules + QC report | R/S profile, some MICs | QC-gated but still a hard call; no calibrated uncertainty or OOD abstention |
-| **Keynome gAST (Day Zero Diagnostics)** | ML on whole genome | R/S prediction | closest ML peer, but proprietary; our differentiator is calibration + explicit no-call + mechanism transparency |
+| **Commercial ML WGS-AST predictors** (e.g. diagnostics startups training ML on whole genomes) | ML on whole genome | R/S prediction | closest peer class, typically proprietary; our differentiator is calibration + explicit no-call + mechanism transparency. *(Verify specific vendors before naming any in the video.)* |
 | **Spore.bio / Spore.Labs** | light/spectroscopy, ML on optical signal | contamination presence/quantity (industrial QC); Spore.Labs now open-source AMR | different modality & setting (factory QC, not clinical genome→drug decision) |
 
 Concretely, our four differentiators — none of which the rule-based incumbents
