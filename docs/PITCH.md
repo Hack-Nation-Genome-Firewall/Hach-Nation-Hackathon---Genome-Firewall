@@ -1,10 +1,54 @@
-# Genome Firewall — pitch narrative + demo script
+# Genome Firewall — pitch narrative + video scripts + demo script
 
 The thesis in one line: **this is a firewall, not a classifier.** A classifier
 guesses on every input; a firewall is trusted because it *refuses to guess when
 it shouldn't*. Everything below sells that distinction.
 
 Fill the `⟦…⟧` slots from `results/pitch_metrics.csv` once the real run finishes.
+
+> **Submission format (confirmed):** NO slide deck. Three ≤60-second videos
+> (Demo / Tech / Team) + the structured written description in
+> `docs/PROJECT_DESCRIPTION.md`. Judging = Creativity · Technical depth ·
+> Presentation. The scripts below are written to those three videos.
+
+---
+
+## 0. The three 60-second video scripts
+
+### Video A — DEMO (≤60s, UI/UX & product flow)
+Screen-record the Streamlit app; voiceover:
+- (0–10s) "A patient has a *Klebsiella* infection. Which antibiotic works?
+  Culture takes 1–3 days. We answer from the genome in seconds."
+- (10–35s) Upload/select a genome → the report appears. Point at one
+  `likely_to_fail` with its mechanism (blaKPC), one `likely_to_work`, and the
+  **calibrated confidence** bar. Say "each call shows *why*, and how sure it is."
+- (35–50s) The **money shot**: the out-of-distribution genome → **no_call →
+  escalate to lab.** "When it hasn't seen anything like this strain, it refuses
+  to guess. That's the firewall."
+- (50–60s) Ask the chat "why is meropenem a no_call?" → grounded plain-English
+  answer. "And it explains itself — no jargon, no invented numbers."
+
+### Video B — TECH (≤60s, stack / architecture / implementation)
+Screen = architecture diagram + a scroll of the repo:
+- (0–15s) "Input: one genome FASTA. AMRFinderPlus extracts resistance markers →
+  a calibrated logistic-regression per drug → a decision layer."
+- (15–35s) "Three things make it trustworthy: **isotonic calibration** so
+  probabilities are real; an **out-of-distribution detector** that abstains; a
+  **deterministic target-presence gate**. Labels are BV-BRC
+  laboratory-measured only — no computational phenotypes."
+- (35–55s) "We validate two ways most tools skip: a **homology-grouped** split so
+  it can't memorize lineages, and a **temporal** split — train on the past,
+  test on the future — because resistance drifts. Real held-out numbers:
+  balanced accuracy ⟦⟧, Brier ⟦⟧, no-call rate ⟦⟧."
+- (55–60s) "Every module validates against one frozen feature contract.
+  Reproducible end to end."
+
+### Video C — TEAM (≤60s, who built it)
+- Each member: name, role, one sentence. Suggested roles:
+  Track A (genome reader + data + splits) · Track B (calibrated models +
+  abstention) · Track C (app + grounded chat) · domain/clinical framing & safety.
+- Close on the shared line: "Four of us — [bio/domain] + three ML engineers —
+  built a tool a hospital could use tomorrow."
 
 ---
 
