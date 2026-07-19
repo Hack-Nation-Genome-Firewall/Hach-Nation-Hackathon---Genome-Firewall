@@ -26,6 +26,7 @@ from module2_predictor.contracts import load_feature_spec  # noqa: E402
 from module2_predictor.predict import load_bundle, predict_genome  # noqa: E402
 from charts import performance_figure, reliability_figure  # noqa: E402
 from chat_assistant import render_floating_assistant  # noqa: E402
+from report_generator import render_report_section  # noqa: E402
 
 
 def _flatten(html_str: str) -> str:
@@ -370,6 +371,11 @@ m3.metric("Likely to fail", counts.get("likely_to_fail", 0))
 m4.metric("No-call", counts.get("no_call", 0))
 st.write("")
 st.markdown("".join(render_card(r) for r in recs), unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------------
+# Detailed AI report (grounded, one-shot) — download/print as PDF.
+# ---------------------------------------------------------------------------
+render_report_section(recs, SPEC, gid, bundle)
 
 # ---------------------------------------------------------------------------
 # Held-out performance (interactive) + metrics table.
