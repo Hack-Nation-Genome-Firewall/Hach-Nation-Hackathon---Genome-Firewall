@@ -17,11 +17,14 @@ into Track B. Everything here is contract-checked against
 - R-rate preserved across splits for all four drugs (e.g. ceftazidime
   0.69/0.65/0.69 train/cal/test; meropenem 0.28/0.26/0.24).
 
-> **Why cgMLST instead of Mash/Sourmash.** The domain expert approved cgMLST
-> HC10: it is a within-species, allele-level clustering already computed by
-> BV-BRC and is at least as strict as a Mash ANI threshold for this use. The
-> no-leakage invariant (no cluster in two splits) is enforced in code, so the
-> guarantee Track B relies on is identical either way.
+> **Why cgMLST instead of Mash/Sourmash.** Chosen on the Track A author's
+> recommendation, with the team lead agreeing to proceed with it: cgMLST HC10 is
+> a within-species, allele-level clustering already computed by BV-BRC, which
+> avoids recomputing pairwise Mash/Sourmash distances over 3,000 assemblies. The
+> HC10 threshold itself still needs formal domain-expert sign-off (see review
+> list below); Mash/Sourmash remains a valid alternative if the reviewer prefers
+> an ANI-based cut. Either way the no-leakage invariant (no cluster in two
+> splits) is enforced in code, so the guarantee Track B relies on is unchanged.
 
 ### 2. Feature assembler — `module1_reader/assemble_features.py`
 Turns a directory of AMRFinderPlus TSVs into the exact Track B contract:
@@ -90,3 +93,6 @@ genomes already annotated, so the run is safe to resume.
 - `drug_targets` — confirm the essential-target gene list per drug and the
   POINT_DISRUPT gate rule.
 - `quality_policy` thresholds (completeness ≥90, contamination ≤5, contigs ≤500).
+- **homology-split key**: confirm cgMLST **HC10** as the grouping threshold (vs a
+  coarser HC level or a Mash/Sourmash ANI cut). The split code is
+  threshold-agnostic, so this can be changed without touching Track B.
