@@ -39,24 +39,26 @@ proof, (4) challenges+metrics, (5) clear visuals.
   per-drug logistic-regression model, isotonic-calibrated, produces a
   probability; a decision layer adds an out-of-distribution detector and a
   target-presence gate. Data is BV-BRC — laboratory-measured labels only."
-- **(22–32s) live proof — show: ~5s screencast of the app returning a verdict.**
+- **(22–32s) live proof — show: ~5s screencast, Demo tab, genome 573.13252.**
   "Here it flags meropenem resistance on a real isolate and names the gene
-  driving it — blaNDM — with its confidence."
+  driving it — blaNDM — with its confidence." *(Verified: genome 573.13252 →
+  meropenem likely_to_fail, p_fail 0.99, blaNDM among supporting markers. Use
+  this exact genome so what's on screen matches the words.)*
 - **(32–48s) highlights + metrics — show: calibration figure, then
-  grouped-vs-temporal.** "Two hard problems we solved: calibration — our
-  reliability curves sit on the diagonal, Brier 0.02 to 0.05 — and honest
-  generalization. On **unseen lineages**, balanced accuracy is **0.94 to 0.98**,
-  versus 0.52 to 0.66 for rule-based tools. On **future isolates** it's lower —
-  **0.78 to 0.94** — and that's the point: under time drift the model abstains
-  more instead of guessing wrong."
+  grouped-vs-temporal.** "Two hard problems we solved: calibration and honest
+  generalization. On **unseen lineages**, balanced accuracy is **0.94 to 0.98**
+  with Brier **0.02 to 0.05**, versus 0.52 to 0.66 for rule-based tools. On
+  **future isolates** it's lower — balanced accuracy **0.78 to 0.94**, Brier up
+  to **0.07** — and that's the point: under time drift the model abstains more
+  instead of guessing wrong."
 - **(48–55s) close — show: a no_call verdict in the app.** "A firewall that knows
   when it doesn't know."
 
-> NOTE ON NUMBERS (do not misstate): "0.94–0.98" balanced accuracy and
-> "Brier 0.02–0.05" are the **homology-grouped (unseen-lineage)** split only.
-> The **temporal (future-isolate)** split is worse — balanced accuracy 0.78
-> (meropenem) to 0.94 (ciprofloxacin), Brier up to 0.068. Always attribute each
-> range to its split; never quote the grouped numbers as if they cover both.
+> NOTE ON NUMBERS (do not misstate): every metric range is **split-specific**.
+> Homology-grouped (unseen-lineage): balanced accuracy 0.94–0.98, Brier
+> 0.02–0.05. Temporal (future-isolate): balanced accuracy 0.78 (meropenem) to
+> 0.94 (ciprofloxacin), Brier 0.05–0.068. Never quote a grouped number as if it
+> covers both splits — say which split each figure is from.
 
 ### Video C — TEAM (≤60s, who built it)
 - Each member: name, role, one sentence. Suggested roles:
