@@ -62,10 +62,22 @@ if ! command -v conda >/dev/null 2>&1; then
 fi
 source "$(conda info --base)/etc/profile.d/conda.sh"
 
+# Recent Miniconda blocks `conda create` on the Anaconda default channels until
+# their Terms of Service are accepted. We use only conda-forge + bioconda (no ToS
+# gate) via --override-channels, and disable the default channels so nothing
+# touches them. The `conda tos accept` calls are a belt-and-braces fallback for
+# conda builds that still probe defaults; guarded so older conda (no `tos`
+# subcommand) doesn't abort the script.
+conda config --system --set channel_priority strict 2>/dev/null || true
+conda config --remove channels defaults 2>/dev/null || true
+conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main 2>/dev/null || true
+conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r    2>/dev/null || true
+
 # ---- 2. AMRFinderPlus env --------------------------------------------------
 if ! conda env list | grep -qw "$ENV_NAME"; then
   echo "[gf] creating conda env '$ENV_NAME' (ncbi-amrfinderplus)…"
-  conda create -y -n "$ENV_NAME" -c conda-forge -c bioconda ncbi-amrfinderplus pandas
+  conda create -y -n "$ENV_NAME" --override-channels -c conda-forge -c bioconda \
+      ncbi-amrfinderplus pandas
 fi
 conda activate "$ENV_NAME"
 python -m pip install --quiet pandas 2>/dev/null || true
