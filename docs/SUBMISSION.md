@@ -8,6 +8,15 @@ genome is unfamiliar. A firewall, not a classifier.
 **Live app:** ⟦paste your streamlit.app URL here after deploy⟧
 **Repo:** https://github.com/liiandy/Hach-Nation-Hackathon---Genome-Firewall
 
+**Short description:** An AI that predicts antibiotic resistance from a bacterial
+genome in seconds, giving clinicians a calibrated probability per drug — and,
+uniquely, refusing to guess when the genome is unfamiliar rather than risking a
+confident wrong answer.
+
+**Technologies / tags:** Python · scikit-learn · Streamlit · AMRFinderPlus ·
+BV-BRC · NumPy · pandas · Plotly · Matplotlib · Machine Learning · Bioinformatics
+· Antimicrobial Resistance
+
 ---
 
 ## 1. The problem
@@ -19,6 +28,19 @@ advances; in septic shock, each hour of ineffective therapy measurably raises
 mortality. Whole-genome sequencing of a clinical isolate is fast and increasingly
 routine, so the genome is available long before the culture result. The question
 is whether we can read resistance *from the genome* — safely enough to act on.
+
+The stakes are not abstract. Carbapenem-resistant *K. pneumoniae* carries roughly
+**42% mortality (versus ~21% for susceptible infections)**, rising to ~54% in
+bloodstream infections and, in ICU cohorts with the most resistant strains,
+**as high as ~70%**. And the decisive variable is speed to the *right* drug:
+**30-day mortality has been reported at 77% when the initial antibiotic was
+inappropriate, versus 9% when it was appropriate.** That gap — 77% versus 9% — is
+the entire problem, and it is exactly the decision Genome Firewall accelerates.
+
+*This problem is personal to our team: our domain lead chose* Klebsiella pneumoniae
+*because she lost a family member to a multidrug-resistant* Klebsiella *infection
+acquired in the ICU. Building the tool that could have given that clinician a fast,
+honest answer is why this project exists.*
 
 ## 2. Why existing tools aren't enough
 
@@ -58,6 +80,8 @@ choice.
 
 ## 4. What makes it novel (USP)
 
+*(Prose version below the table — paste-safe for editors without table support.)*
+
 | | Rule-based tools (ResFinder/CARD/AMRFinderPlus, Pathogenwatch, Kleborate) | Commercial ML WGS-AST predictors | **Genome Firewall** |
 |---|---|---|---|
 | Output | binary R/S | R/S prediction | **calibrated probability + verdict** |
@@ -65,6 +89,21 @@ choice.
 | Mechanism shown | gene list | usually opaque | **per-call markers + evidence tier** |
 | Validation | in-distribution | in-distribution | **homology-grouped + temporal** |
 | Stewardship | none | none | **narrowest-spectrum, safe-by-construction** |
+
+**Paste-safe prose version (no table):**
+
+- **Output:** rule-based tools give a binary resistant/susceptible call; commercial
+  ML predictors give an R/S prediction; **Genome Firewall gives a calibrated
+  probability plus a verdict.**
+- **Says "I don't know":** rule-based tools never abstain; commercial ML rarely
+  does; **Genome Firewall abstains explicitly via an out-of-distribution firewall.**
+- **Mechanism shown:** rule-based tools show a gene list; commercial ML is usually
+  opaque; **Genome Firewall names the per-call driving markers with an evidence
+  tier.**
+- **Validation:** both incumbents validate in-distribution only; **Genome Firewall
+  validates on a homology-grouped split *and* a temporal split.**
+- **Stewardship:** neither incumbent offers it; **Genome Firewall recommends the
+  narrowest-spectrum effective drug, safe by construction.**
 
 The core claim: **incumbents give a confident binary call; we give a calibrated
 probability with an honest refusal when the genome is unfamiliar.** That is the

@@ -15,18 +15,34 @@ Fill the `⟦…⟧` slots from `results/pitch_metrics.csv` once the real run fi
 
 ## 0. The three 60-second video scripts
 
-### Video A — DEMO (≤60s, UI/UX & product flow)
-Screen-record the Streamlit app; voiceover:
-- (0–10s) "A patient has a *Klebsiella* infection. Which antibiotic works?
-  Culture takes 1–3 days. We answer from the genome in seconds."
-- (10–35s) Upload/select a genome → the report appears. Point at one
-  `likely_to_fail` with its mechanism (blaKPC), one `likely_to_work`, and the
-  **calibrated confidence** bar. Say "each call shows *why*, and how sure it is."
-- (35–50s) The **money shot**: the out-of-distribution genome → **no_call →
-  escalate to lab.** "When it hasn't seen anything like this strain, it refuses
-  to guess. That's the firewall."
-- (50–60s) Ask the chat "why is meropenem a no_call?" → grounded plain-English
-  answer. "And it explains itself — no jargon, no invented numbers."
+### Video A — DEMO (~55s, UI/UX & product flow) — FINAL READ-ALOUD SCRIPT
+*Screen: the live app throughout. Have genome 573.13252 (resistant) and 573.46111
+(clean) ready in the Demo tab. Read the quoted text; italics are screen cues.*
+
+> "When a patient is admitted with a Klebsiella infection, the doctor has to
+> choose an antibiotic immediately — but the lab culture that tells you which drug
+> will work takes one to three days. Genome Firewall answers in seconds, straight
+> from the bacterium's genome.
+>
+> *(select genome 573.13252)* This is a real resistant isolate. Meropenem —
+> likely to fail, and it shows you why: the blaNDM carbapenemase gene.
+> Ciprofloxacin — likely to fail, driven by a gyrA mutation. Every call comes with
+> a calibrated confidence, not just a yes or no.
+>
+> *(select genome 573.46111)* Now a clean isolate. All four antibiotics — likely
+> to work, and it recommends the narrowest-spectrum option so we don't waste the
+> last-line drugs.
+>
+> *(show a no_call verdict)* And when a genome looks unlike anything it was trained
+> on, it refuses to guess — it returns no-call, escalate to the lab. Every report
+> carries the same reminder: confirm with standard lab testing.
+>
+> Genome Firewall — antibiotic decisions in seconds, honest about what it doesn't
+> know. Usable in a hospital tomorrow."
+
+*(All verdicts verified against the real bundle: 573.13252 → all four
+likely_to_fail, blaNDM + gyrA markers present; 573.46111 → all four
+likely_to_work, no markers.)*
 
 ### Video B — TECH (~55s, stack / architecture / implementation)
 Maps to the judges' 5 asks: (1) what it does, (2) architecture/APIs, (3) live
