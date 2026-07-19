@@ -305,13 +305,76 @@ splits = pd.read_csv(SPLITS_PATH, dtype={"genome_id": str, "cluster_id": str})
 held = feats.merge(splits, on="genome_id", validate="one_to_one")
 held = held[held.split == "test"]
 
+if not BUNDLE_PATH.exists():
+    st.error("Model bundle is missing. Run `python -m module2_predictor.train` first.")
+    st.stop()
+bundle = load_bundle(BUNDLE_PATH)
+
+
+def render_genome_report(row: dict, gid: str, *, from_upload: bool = False) -> list:
+    """Render the genome-specific report (verdict strip + cards + AI report) for one
+    genome. Called INSIDE each input tab so every tab owns its own report — the Upload
+    tab therefore stays blank until a FASTA is actually uploaded, instead of sharing
+    (and overwriting) the demo genome's report. Returns the per-drug recommendations."""
+    recs = predict_genome(row, bundle, SPEC)
+    counts = Counter(r["verdict"] for r in recs)
+    st.subheader(f"Antibiotic-response report — `{gid}`")
+
+    if from_upload:
+        _uploaded = st.session_state.get("_uploaded")
+        if _uploaded and _uploaded[0] == gid:
+            _name, _unknown, _via_sample = _uploaded
+            _src = "Track A's bundled sample annotation" if _via_sample else "AMRFinderPlus"
+            _found = ", ".join(f"`{m}`" for m in _unknown[:12]) + (" …" if len(_unknown) > 12 else "")
+            st.info(
+                f"**Live Track A wiring.** This report was built end to end from your "
+                f"upload: **{_name}** → {_src} → feature row → prediction. The reader parsed "
+                f"the genome and preserved **{len(_unknown)} marker(s)** it found"
+                + (f": {_found}" if _unknown else "")
+                + ". Because the *deployed model* is still the synthetic fixture (its "
+                "vocabulary is `marker__known__*`, not real gene names), those real markers "
+                "are carried as **unknown** rather than scored — so the verdicts below are a "
+                "**pipeline demonstration, not a biological result**. They become meaningful "
+                "once Phase 0 publishes the shared spec and Track B trains a bundle on it.")
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Antibiotics", len(recs))
+    m2.metric("Likely to work", counts.get("likely_to_work", 0))
+    m3.metric("Likely to fail", counts.get("likely_to_fail", 0))
+    m4.metric("No-call", counts.get("no_call", 0))
+    st.write("")
+    st.markdown("".join(render_card(r) for r in recs), unsafe_allow_html=True)
+    # Detailed AI report (grounded, one-shot) — download/print as PDF.
+    render_report_section(recs, SPEC, gid, bundle)
+    return recs
+
+
+def _use_demo():
+    st.session_state["_active_source"] = "demo"
+
+
+def _use_upload():
+    st.session_state["_active_source"] = "upload"
+
+
+# Each tab renders its OWN report, so switching tabs is a pure client-side swap and
+# the Upload tab shows nothing until a FASTA is uploaded. `_active_source` (set by the
+# widgets' on_change) records the input the user last touched — it decides which genome
+# the single floating assistant answers about (its widget keys are fixed, so it must be
+# rendered exactly once, outside the tabs).
+demo_recs, demo_gid = None, None
+up_recs, up_gid = None, None
+
 tab_demo, tab_upload = st.tabs(["Demo genome (held-out)", "Upload a genome (FASTA)"])
 with tab_demo:
-    gid = st.selectbox("Held-out demo genome:", held.genome_id.tolist())
+    gid = st.selectbox("Held-out demo genome:", held.genome_id.tolist(),
+                       key="demo_gid", on_change=_use_demo)
     row = held[held.genome_id == gid].iloc[0].to_dict()
+    demo_recs, demo_gid = render_genome_report(row, gid), gid
 with tab_upload:
     up = st.file_uploader("Assembled genome — FASTA (.fasta / .fa / .fna)",
-                          type=["fasta", "fa", "fna"])
+                          type=["fasta", "fa", "fna"], key="fasta_up",
+                          on_change=_use_upload)
     st.caption("This runs the real pipeline: your genome → Track A's reader "
                "(`module1_reader.run_genome_reader`) → feature row → prediction. "
                "The report below then renders for **your** genome.")
@@ -326,10 +389,10 @@ with tab_upload:
         try:
             up_row, up_unknown = build_feature_row_from_fasta(
                 up.getvalue(), genome_id=up.name, tsv_override=tsv_override)
-            row, gid = up_row, up.name          # drive the report from the upload
             st.session_state["_uploaded"] = (up.name, up_unknown, bool(tsv_override))
             st.success(f"Track A's reader parsed **{up.name}** "
                        f"({up.size/1000:.0f} kB) into a contract-valid feature row.")
+            up_recs, up_gid = render_genome_report(up_row, up.name, from_upload=True), up.name
         except FileNotFoundError:
             st.warning(
                 "The reader is fully wired, but **AMRFinderPlus is not installed on "
@@ -338,47 +401,12 @@ with tab_upload:
                 "A's bundled sample annotation, or install AMRFinderPlus to run for real.")
         except Exception as e:  # ContractError and friends — surface the real reason
             st.error(f"Track A's reader could not build a feature row: {e}")
-
-if not BUNDLE_PATH.exists():
-    st.error("Model bundle is missing. Run `python -m module2_predictor.train` first.")
-    st.stop()
-bundle = load_bundle(BUNDLE_PATH)
-recs = predict_genome(row, bundle, SPEC)
-
-# ---- summary strip ----
-counts = Counter(r["verdict"] for r in recs)
-st.subheader(f"Antibiotic-response report — `{gid}`")
-
-_uploaded = st.session_state.get("_uploaded")
-if _uploaded and _uploaded[0] == gid:
-    _name, _unknown, _via_sample = _uploaded
-    _src = "Track A's bundled sample annotation" if _via_sample else "AMRFinderPlus"
-    _found = ", ".join(f"`{m}`" for m in _unknown[:12]) + (" …" if len(_unknown) > 12 else "")
-    st.info(
-        f"**Live Track A wiring.** This report was built end to end from your "
-        f"upload: **{_name}** → {_src} → feature row → prediction. The reader parsed "
-        f"the genome and preserved **{len(_unknown)} marker(s)** it found"
-        + (f": {_found}" if _unknown else "")
-        + ". Because the *deployed model* is still the synthetic fixture (its "
-        "vocabulary is `marker__known__*`, not real gene names), those real markers "
-        "are carried as **unknown** rather than scored — so the verdicts below are a "
-        "**pipeline demonstration, not a biological result**. They become meaningful "
-        "once Phase 0 publishes the shared spec and Track B trains a bundle on it.")
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("Antibiotics", len(recs))
-m2.metric("Likely to work", counts.get("likely_to_work", 0))
-m3.metric("Likely to fail", counts.get("likely_to_fail", 0))
-m4.metric("No-call", counts.get("no_call", 0))
-st.write("")
-st.markdown("".join(render_card(r) for r in recs), unsafe_allow_html=True)
+    else:
+        st.info("⬆️ Upload an assembled genome (FASTA) above to generate its "
+                "antibiotic-response report here.")
 
 # ---------------------------------------------------------------------------
-# Detailed AI report (grounded, one-shot) — download/print as PDF.
-# ---------------------------------------------------------------------------
-render_report_section(recs, SPEC, gid, bundle)
-
-# ---------------------------------------------------------------------------
-# Held-out performance (interactive) + metrics table.
+# Held-out performance (interactive) + metrics table.  [model-level — always shown]
 # ---------------------------------------------------------------------------
 st.divider()
 st.subheader("Held-out performance & calibration")
@@ -419,5 +447,10 @@ st.caption("Human oversight required: a trained healthcare or laboratory profess
 
 # ---------------------------------------------------------------------------
 # Floating "explain this report" assistant (grounded + safety-guarded).
+# Rendered once, for whichever genome is the active input source (last touched).
 # ---------------------------------------------------------------------------
-render_floating_assistant(recs, SPEC, gid)
+if st.session_state.get("_active_source") == "upload" and up_recs is not None:
+    fa_recs, fa_gid = up_recs, up_gid
+else:
+    fa_recs, fa_gid = demo_recs, demo_gid
+render_floating_assistant(fa_recs, SPEC, fa_gid)

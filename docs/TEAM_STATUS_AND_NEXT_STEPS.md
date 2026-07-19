@@ -1,7 +1,7 @@
 # Genome Firewall: Team Status and Next Steps
 
 **Status snapshot:** 19 July 2026 (Track C — FASTA upload wired to Track A reader;
-grounded AI report assistant added)
+grounded AI report assistant added; per-tab report isolation / upload UX fix)
 
 **Repository:** https://github.com/liiandy/Hach-Nation-Hackathon---Genome-Firewall
 
@@ -180,6 +180,18 @@ demo-ready interface:
   preserved as unknown markers rather than scored. It becomes a real biological
   result once Phase 0 publishes the shared `feature_spec.json` and Track B trains a
   bundle on that vocabulary.
+- **Per-tab report isolation (upload UX fix).** The "Demo genome" and "Upload a
+  genome" tabs now each own their report instead of sharing one report block below
+  the tabs. Two bugs are fixed: (a) because Streamlit keeps an uploaded file in
+  widget state across reruns, the upload block used to re-run and overwrite the demo
+  selection on every interaction, so after one upload the demo-genome dropdown looked
+  dead until a full page refresh; (b) the Upload tab showed the demo genome's report
+  before anything was uploaded. The genome-specific report is now a
+  `render_genome_report(row, gid)` function called *inside* each tab, so switching
+  tabs is a pure client-side swap, the Upload tab stays blank (with an "upload a
+  FASTA" prompt) until a genome is parsed, and an `on_change`-tracked `_active_source`
+  decides which genome the single floating assistant answers about. The model-level
+  held-out performance section stays rendered once, below the tabs.
 - **Figures ported to the real contract.** `TrackC/make_figures.py` now reads
   `data/synthetic/*` + the joblib bundle (was still on the old
   `data/manifests/feature_spec.json` layout) and regenerates the static
