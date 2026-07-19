@@ -28,20 +28,35 @@ Screen-record the Streamlit app; voiceover:
 - (50–60s) Ask the chat "why is meropenem a no_call?" → grounded plain-English
   answer. "And it explains itself — no jargon, no invented numbers."
 
-### Video B — TECH (≤60s, stack / architecture / implementation)
-Screen = architecture diagram + a scroll of the repo:
-- (0–15s) "Input: one genome FASTA. AMRFinderPlus extracts resistance markers →
-  a calibrated logistic-regression per drug → a decision layer."
-- (15–35s) "Three things make it trustworthy: **isotonic calibration** so
-  probabilities are real; an **out-of-distribution detector** that abstains; a
-  **deterministic target-presence gate**. Labels are BV-BRC
-  laboratory-measured only — no computational phenotypes."
-- (35–55s) "We validate two ways most tools skip: a **homology-grouped** split so
-  it can't memorize lineages, and a **temporal** split — train on the past,
-  test on the future — because resistance drifts. Real held-out numbers:
-  balanced accuracy ⟦⟧, Brier ⟦⟧, no-call rate ⟦⟧."
-- (55–60s) "Every module validates against one frozen feature contract.
-  Reproducible end to end."
+### Video B — TECH (~55s, stack / architecture / implementation)
+Maps to the judges' 5 asks: (1) what it does, (2) architecture/APIs, (3) live
+proof, (4) challenges+metrics, (5) clear visuals.
+- **(0–8s) what it does — show: architecture diagram.** "Genome Firewall reads a
+  *Klebsiella* patient's genome and predicts which antibiotics will work — with
+  calibrated confidence, and an honest refusal when it isn't sure."
+- **(8–22s) architecture & stack — show: architecture diagram, trace the flow.**
+  "The pipeline: AMRFinderPlus extracts resistance markers from the genome; a
+  per-drug logistic-regression model, isotonic-calibrated, produces a
+  probability; a decision layer adds an out-of-distribution detector and a
+  target-presence gate. Data is BV-BRC — laboratory-measured labels only."
+- **(22–32s) live proof — show: ~5s screencast of the app returning a verdict.**
+  "Here it flags meropenem resistance on a real isolate and names the gene
+  driving it — blaNDM — with its confidence."
+- **(32–48s) highlights + metrics — show: calibration figure, then
+  grouped-vs-temporal.** "Two hard problems we solved: calibration — our
+  reliability curves sit on the diagonal, Brier 0.02 to 0.05 — and honest
+  generalization. On **unseen lineages**, balanced accuracy is **0.94 to 0.98**,
+  versus 0.52 to 0.66 for rule-based tools. On **future isolates** it's lower —
+  **0.78 to 0.94** — and that's the point: under time drift the model abstains
+  more instead of guessing wrong."
+- **(48–55s) close — show: a no_call verdict in the app.** "A firewall that knows
+  when it doesn't know."
+
+> NOTE ON NUMBERS (do not misstate): "0.94–0.98" balanced accuracy and
+> "Brier 0.02–0.05" are the **homology-grouped (unseen-lineage)** split only.
+> The **temporal (future-isolate)** split is worse — balanced accuracy 0.78
+> (meropenem) to 0.94 (ciprofloxacin), Brier up to 0.068. Always attribute each
+> range to its split; never quote the grouped numbers as if they cover both.
 
 ### Video C — TEAM (≤60s, who built it)
 - Each member: name, role, one sentence. Suggested roles:
