@@ -23,7 +23,10 @@ FIXTURE_TSV = fa.MODULE_DIR / "fixtures" / "sample_amrfinder.tsv"
 
 @pytest.fixture
 def spec():
-    return load_spec()
+    # These are unit tests of the reader against a KNOWN vocabulary, so pin the
+    # bundled sample explicitly — NOT load_spec()'s default, which now resolves to
+    # the deployed data/manifests/feature_spec.json once Phase 0 has published it.
+    return load_spec(fa.SAMPLE_SPEC_PATH)
 
 
 # --------------------------------------------------------------------------- #
@@ -182,11 +185,23 @@ def test_get_annotator_unknown_backend_raises(spec):
         get_annotator("does-not-exist", spec)
 
 
-def test_spec_falls_back_to_bundled_sample():
-    assert not fa.SHARED_SPEC_PATH.exists()
+def test_spec_falls_back_to_bundled_sample(monkeypatch, tmp_path):
+    # With no shared Phase-0 spec present, load_spec() must resolve to the bundled
+    # sample. Monkeypatched to a non-existent path so the test is robust whether or
+    # not a real spec is deployed at data/manifests/feature_spec.json.
+    monkeypatch.setattr(fa, "SHARED_SPEC_PATH", tmp_path / "absent.json")
     s = load_spec()
     assert s["species"]["name"] == "Klebsiella pneumoniae"
     assert set(s["drugs"]) == {"meropenem", "ciprofloxacin", "gentamicin", "ceftazidime"}
+
+
+def test_spec_prefers_shared_when_present(monkeypatch, tmp_path):
+    # When Phase 0's shared spec exists, load_spec() must prefer it over the sample.
+    shared = tmp_path / "feature_spec.json"
+    shared.write_text('{"species": {"name": "Test sp."}, "drugs": ["x"]}')
+    monkeypatch.setattr(fa, "SHARED_SPEC_PATH", shared)
+    s = load_spec()
+    assert s["species"]["name"] == "Test sp." and s["drugs"] == ["x"]
 
 
 # --------------------------------------------------------------------------- #
@@ -213,7 +228,7 @@ def test_sample_spec_stays_aligned_with_project_config(spec):
 # --------------------------------------------------------------------------- #
 def test_sample_spec_passes_track_b_feature_spec_validation():
     contracts = pytest.importorskip("module2_predictor.contracts")
-    contracts.validate_feature_spec(load_spec())  # raises if our schema is off-contract
+    contracts.validate_feature_spec(load_spec(fa.SAMPLE_SPEC_PATH))  # sample must be a valid Track B spec
 
 
 def test_feature_row_passes_track_b_inference_validation(spec):
