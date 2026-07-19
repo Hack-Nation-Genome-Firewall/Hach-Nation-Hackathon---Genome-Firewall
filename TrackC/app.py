@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))  # for local charts.py
 from module2_predictor.contracts import load_feature_spec  # noqa: E402
 from module2_predictor.predict import load_bundle, predict_genome  # noqa: E402
 from charts import performance_figure, reliability_figure  # noqa: E402
+from chat_assistant import render_floating_assistant  # noqa: E402
 
 
 def _flatten(html_str: str) -> str:
@@ -41,7 +42,21 @@ EVAL_DIR = HERE / "eval"
 SPEC = load_feature_spec(SPEC_PATH)
 IS_SYNTHETIC = bool(SPEC.get("synthetic"))
 
-st.set_page_config(page_title="Genome Firewall", page_icon="🧬", layout="wide")
+_FAVICON = Path(__file__).resolve().parent / "assets" / "shield.svg"
+st.set_page_config(
+    page_title="Genome Firewall",
+    page_icon=str(_FAVICON) if _FAVICON.exists() else None,
+    layout="wide",
+)
+
+# Monochrome shield mark reused for the hero + assistant panel (no emoji anywhere).
+GF_MARK = (
+    '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" '
+    'style="width:1.6rem;height:1.6rem;flex:none;vertical-align:middle">'
+    '<path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3Z" fill="#e7f0fb" '
+    'stroke="#0052a3" stroke-width="1.5" stroke-linejoin="round"/>'
+    '<path d="M8 12h8M12 8.5v7" stroke="#0052a3" stroke-width="1.6" stroke-linecap="round"/></svg>'
+)
 
 # ---------------------------------------------------------------------------
 # Presentation layer — IBM Plex fonts + clinical-blue card system.
@@ -113,7 +128,7 @@ st.markdown(
 
 # ---- mandatory safety banner (non-negotiable per brief) ----
 st.error(
-    "⚠️ RESEARCH PROTOTYPE — Every antibiotic-response report **must be confirmed "
+    "RESEARCH PROTOTYPE — Every antibiotic-response report **must be confirmed "
     "with standard laboratory testing**. This tool is decision support only and "
     "must never make a treatment decision on its own. Not for clinical use."
 )
@@ -124,7 +139,7 @@ if IS_SYNTHETIC:
         _flatten(
             """
             <div class="gf-ribbon">
-              <b>🧪 SYNTHETIC INTEGRATION MODE — we are disclosing this openly.</b><br>
+              <b>SYNTHETIC INTEGRATION MODE — we are disclosing this openly.</b><br>
               This demo runs on a <b>synthetic fixture</b>, not real BV-BRC genomes. The
               <em>machinery</em> is real and reproducible — calibration, the deterministic
               target gate, no-call abstention, the homology-grouped split and every metric.
@@ -141,7 +156,7 @@ if IS_SYNTHETIC:
 st.markdown(
     _flatten(
         """
-        <div class="gf-hero"><span style="font-size:1.9rem">🧬</span>
+        <div class="gf-hero">""" + GF_MARK + """
           <span class="gf-hero-title">Genome Firewall</span></div>
         <div class="gf-hero-sub">Defensive decision support: it predicts and <em>explains</em> antibiotic
           resistance that already exists — it never designs, modifies, or optimizes an organism.</div>
@@ -179,11 +194,11 @@ VERDICT_META = {
     "no_call":        ("nocall", "● NO-CALL"),
 }
 TIER_META = {
-    "known_marker":     ("known", "🧬 KNOWN RESISTANCE MARKER",
+    "known_marker":     ("known", "KNOWN RESISTANCE MARKER",
                          "A known resistance gene / DNA change was detected — the strongest evidence tier."),
-    "statistical_only": ("stat", "📊 STATISTICAL ASSOCIATION ONLY",
+    "statistical_only": ("stat", "STATISTICAL ASSOCIATION ONLY",
                          "Model association only — <b>not</b> proof of a biological mechanism. Treat with care."),
-    "no_signal":        ("none", "— NO KNOWN SIGNAL",
+    "no_signal":        ("none", "NO KNOWN SIGNAL",
                          "No known resistance signal was found for this drug."),
 }
 REASON_LABEL = {
@@ -289,7 +304,7 @@ splits = pd.read_csv(SPLITS_PATH, dtype={"genome_id": str, "cluster_id": str})
 held = feats.merge(splits, on="genome_id", validate="one_to_one")
 held = held[held.split == "test"]
 
-tab_demo, tab_upload = st.tabs(["🧬 Demo genome (held-out)", "📤 Upload a genome (FASTA)"])
+tab_demo, tab_upload = st.tabs(["Demo genome (held-out)", "Upload a genome (FASTA)"])
 with tab_demo:
     gid = st.selectbox("Held-out demo genome:", held.genome_id.tolist())
     row = held[held.genome_id == gid].iloc[0].to_dict()
@@ -312,7 +327,7 @@ with tab_upload:
                 up.getvalue(), genome_id=up.name, tsv_override=tsv_override)
             row, gid = up_row, up.name          # drive the report from the upload
             st.session_state["_uploaded"] = (up.name, up_unknown, bool(tsv_override))
-            st.success(f"✅ Track A's reader parsed **{up.name}** "
+            st.success(f"Track A's reader parsed **{up.name}** "
                        f"({up.size/1000:.0f} kB) into a contract-valid feature row.")
         except FileNotFoundError:
             st.warning(
@@ -339,7 +354,7 @@ if _uploaded and _uploaded[0] == gid:
     _src = "Track A's bundled sample annotation" if _via_sample else "AMRFinderPlus"
     _found = ", ".join(f"`{m}`" for m in _unknown[:12]) + (" …" if len(_unknown) > 12 else "")
     st.info(
-        f"🔗 **Live Track A wiring.** This report was built end to end from your "
+        f"**Live Track A wiring.** This report was built end to end from your "
         f"upload: **{_name}** → {_src} → feature row → prediction. The reader parsed "
         f"the genome and preserved **{len(_unknown)} marker(s)** it found"
         + (f": {_found}" if _unknown else "")
@@ -395,3 +410,8 @@ else:
 st.divider()
 st.caption("Human oversight required: a trained healthcare or laboratory professional "
            "must confirm every result before any treatment decision.")
+
+# ---------------------------------------------------------------------------
+# Floating "explain this report" assistant (grounded + safety-guarded).
+# ---------------------------------------------------------------------------
+render_floating_assistant(recs, SPEC, gid)

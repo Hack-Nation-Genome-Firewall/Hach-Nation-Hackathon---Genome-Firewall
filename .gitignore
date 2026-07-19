@@ -20,6 +20,8 @@ eval/*.json
 .env
 .env.*
 !.env.example
+.streamlit/secrets.toml
+!.streamlit/secrets.toml.example
 .idea/
 .vscode/
 
