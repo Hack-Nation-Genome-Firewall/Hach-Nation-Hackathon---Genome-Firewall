@@ -42,7 +42,7 @@ PY
 if [ "${NEED_INSTALL:-0}" = "1" ]; then
   echo "[ab] installing torch + transformers…"
   pip install --quiet torch --index-url https://download.pytorch.org/whl/cu121
-  pip install --quiet "transformers==4.44.2" einops sklearn scikit-learn pandas numpy
+  pip install --quiet "transformers==4.44.2" einops scikit-learn pandas numpy
 fi
 
 echo "[ab] GPU check:"; python -c "import torch; print('cuda', torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else '-')"
