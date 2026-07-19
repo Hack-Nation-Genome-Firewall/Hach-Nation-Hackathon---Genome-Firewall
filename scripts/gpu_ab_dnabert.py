@@ -56,11 +56,15 @@ def main():
     ap.add_argument("--labels", default="data/manifests/labels.csv")
     ap.add_argument("--splits", default="data/manifests/split_manifest.csv")
     ap.add_argument("--drug", default="ciprofloxacin")
-    ap.add_argument("--window", type=int, default=10000)
+    ap.add_argument("--window", type=int, default=5000)
     ap.add_argument("--n-windows", type=int, default=24)
     ap.add_argument("--max-train", type=int, default=400)
     ap.add_argument("--max-test", type=int, default=150)
-    ap.add_argument("--model", default="zhihan1996/DNABERT-2-117M")
+    # Nucleotide Transformer (InstaDeep): multi-species (incl. bacteria), loads on
+    # standard transformers, no flash-attn/triton — robust on Ada GPUs (L40S/L4)
+    # where DNABERT-2's custom kernel breaks. Still a bona-fide genome LM baseline.
+    ap.add_argument("--model", default="InstaDeepAI/nucleotide-transformer-v2-250m-multi-species")
+    ap.add_argument("--max-length", type=int, default=1000)
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--feature-balacc", type=float, default=None,
                     help="feature-model balanced acc for this drug/split, for the printout")
@@ -68,7 +72,7 @@ def main():
     args = ap.parse_args()
 
     import torch
-    from transformers import AutoTokenizer, AutoModel
+    from transformers import AutoTokenizer, AutoModelForMaskedLM
     from sklearn.linear_model import LogisticRegression
     from sklearn.metrics import balanced_accuracy_score
 
@@ -88,17 +92,20 @@ def main():
     log(f"[ab] train={len(tr)}  test={len(te)}  (subsampled)")
 
     tok = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
-    mdl = AutoModel.from_pretrained(args.model, trust_remote_code=True).to(dev).eval()
+    mdl = AutoModelForMaskedLM.from_pretrained(args.model, trust_remote_code=True).to(dev).eval()
 
     def embed_windows(wins):
         vecs = []
         for i in range(0, len(wins), args.batch):
             chunk = wins[i:i + args.batch]
-            enc = tok(chunk, return_tensors="pt", padding=True, truncation=True, max_length=512).to(dev)
+            enc = tok(chunk, return_tensors="pt", padding=True, truncation=True,
+                      max_length=args.max_length).to(dev)
             with torch.no_grad():
-                out = mdl(**enc)[0]                      # (B, T, H)
+                # Nucleotide Transformer: ask for hidden states, mean-pool last layer
+                out = mdl(**enc, output_hidden_states=True)
+                hidden = out.hidden_states[-1]           # (B, T, H)
                 mask = enc["attention_mask"].unsqueeze(-1)
-                pooled = (out * mask).sum(1) / mask.sum(1).clamp(min=1)
+                pooled = (hidden * mask).sum(1) / mask.sum(1).clamp(min=1)
             vecs.append(pooled.cpu().numpy())
         return np.vstack(vecs).mean(0)                   # mean over windows -> (H,)
 
@@ -133,7 +140,7 @@ def main():
 
     lines = [
         f"A/B on {args.drug} (grouped test split, n_test={len(yte)})",
-        f"  DNABERT-2 genome-embedding + LogReg : balanced accuracy = {dnabert_ba:.3f}",
+        f"  Genome-LM (Nucleotide Transformer) + LogReg : balanced accuracy = {dnabert_ba:.3f}",
         f"  AMRFinderPlus features (our model)  : balanced accuracy = "
         + (f"{feat:.3f}" if feat is not None else "(run make_pitch_results.py first)"),
         "",
