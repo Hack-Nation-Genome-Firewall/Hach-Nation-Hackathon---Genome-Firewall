@@ -35,17 +35,28 @@ if ! conda env list | grep -qw "$ENV_NAME"; then
 fi
 conda activate "$ENV_NAME"
 
-# torch with CUDA + the deps DNABERT-2 needs. cu121 wheels work on L40S/L4/A6000/V100.
-python - <<'PY' 2>/dev/null || NEED_INSTALL=1
-import torch, transformers, sklearn, einops  # noqa
-PY
-if [ "${NEED_INSTALL:-0}" = "1" ]; then
-  echo "[ab] installing torch + transformers…"
-  pip install --quiet torch --index-url https://download.pytorch.org/whl/cu121
+# --- non-torch deps (transformers etc.) ---
+python -c "import transformers, sklearn, einops, pandas, numpy" 2>/dev/null || {
+  echo "[ab] installing transformers + deps…"
   pip install --quiet "transformers==4.44.2" einops scikit-learn pandas numpy
+}
+
+# --- torch WITH CUDA — self-healing: a CPU-only torch imports fine but reports
+#     cuda False, so we must check is_available(), not just importability, and
+#     force-reinstall the cu121 build if CUDA is missing. cu121 wheels run on
+#     the L40S/L4/A6000/V100 nodes. ---
+CUDA_OK=$(python -c "import torch; print(torch.cuda.is_available())" 2>/dev/null || echo missing)
+if [ "$CUDA_OK" != "True" ]; then
+  echo "[ab] torch CUDA unavailable ($CUDA_OK) — installing cu121 build…"
+  pip install --quiet --force-reinstall --no-cache-dir torch --index-url https://download.pytorch.org/whl/cu121
+  CUDA_OK=$(python -c "import torch; print(torch.cuda.is_available())" 2>/dev/null || echo missing)
 fi
 
 echo "[ab] GPU check:"; python -c "import torch; print('cuda', torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else '-')"
+if [ "$CUDA_OK" != "True" ]; then
+  echo "[ab] WARNING: still no CUDA after reinstall — likely a driver/cu-version mismatch on this node."
+  echo "[ab] Proceeding on CPU (slow). Check 'nvidia-smi' driver version if you want the matching cuXXX wheel."
+fi
 
 # ---- run the A/B --------------------------------------------------------------
 python scripts/gpu_ab_dnabert.py \
