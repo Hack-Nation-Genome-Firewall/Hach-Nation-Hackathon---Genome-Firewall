@@ -97,17 +97,18 @@ difference between a tool a clinician *reads* and a tool a clinician can *trust*
 **Homology-grouped split** — the honest, no-memorization test. Every metric the
 challenge rubric asks for, per drug:
 
-| Drug | Balanced acc | Recall(R) | Recall(S) | F1 | AUROC | PR-AUC | Brier | No-call rate | Called acc |
+| Drug | Balanced acc | Recall(R) | Recall(S) | F1 | AUROC | PR-AUC | Brier | No-call rate | Called bal.acc |
 |---|---|---|---|---|---|---|---|---|---|
-| ciprofloxacin | **0.978** | 0.982 | 0.975 | 0.984 | 0.995 | 0.997 | 0.020 | 36% | 0.985 |
-| meropenem | **0.937** | 0.913 | 0.961 | 0.895 | 0.970 | 0.936 | 0.042 | 74% | 0.885 |
+| ciprofloxacin | **0.978** | 0.982 | 0.975 | 0.984 | 0.995 | 0.997 | 0.020 | 36% | 0.821 |
+| meropenem | **0.937** | 0.913 | 0.961 | 0.895 | 0.970 | 0.936 | 0.042 | 74% | 0.714 |
 | gentamicin | **0.935** | 0.880 | 0.989 | 0.925 | 0.967 | 0.957 | 0.041 | 38% | 0.976 |
-| ceftazidime | **0.935** | 0.948 | 0.922 | 0.956 | 0.976 | 0.988 | 0.047 | 31% | 0.962 |
+| ceftazidime | **0.935** | 0.948 | 0.922 | 0.956 | 0.976 | 0.988 | 0.047 | 31% | 0.728 |
 
 *Recall(R) = recall on resistant cases (drug likely to fail); Recall(S) = recall
 on susceptible cases (drug likely to work), reported separately as required.
-No-call rate = fraction abstained; Called acc = accuracy on the non-abstained
-predictions. Full numbers in `results/pitch_metrics.csv`; per-drug reliability
+No-call rate = fraction abstained; Called bal.acc = balanced accuracy on the
+non-abstained predictions (balanced, not raw accuracy, to stay honest under class
+imbalance). Full numbers in `results/pitch_metrics.csv`; per-drug reliability
 curves in `results/fig_calibration_real.png`.*
 
 **Generalization by genetic group** (rubric: "performance broken down by
