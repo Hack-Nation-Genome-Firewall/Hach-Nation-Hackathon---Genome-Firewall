@@ -94,14 +94,28 @@ difference between a tool a clinician *reads* and a tool a clinician can *trust*
 
 ## 6. Results (real held-out data)
 
-**Homology-grouped split** — the honest, no-memorization test:
+**Homology-grouped split** — the honest, no-memorization test. Every metric the
+challenge rubric asks for, per drug:
 
-| Drug | Balanced acc | Recall(R) | Recall(S) | AUROC | Brier | No-call |
-|---|---|---|---|---|---|---|
-| ciprofloxacin | **0.978** | 0.98 | 0.98 | 0.995 | 0.020 | 36% |
-| meropenem | **0.937** | 0.91 | 0.96 | 0.970 | 0.042 | 74% |
-| gentamicin | **0.935** | 0.88 | 0.99 | 0.967 | 0.041 | 38% |
-| ceftazidime | **0.935** | 0.95 | 0.92 | 0.976 | 0.047 | 31% |
+| Drug | Balanced acc | Recall(R) | Recall(S) | F1 | AUROC | PR-AUC | Brier | No-call rate | Called acc |
+|---|---|---|---|---|---|---|---|---|---|
+| ciprofloxacin | **0.978** | 0.982 | 0.975 | 0.984 | 0.995 | 0.997 | 0.020 | 36% | 0.985 |
+| meropenem | **0.937** | 0.913 | 0.961 | 0.895 | 0.970 | 0.936 | 0.042 | 74% | 0.885 |
+| gentamicin | **0.935** | 0.880 | 0.989 | 0.925 | 0.967 | 0.957 | 0.041 | 38% | 0.976 |
+| ceftazidime | **0.935** | 0.948 | 0.922 | 0.956 | 0.976 | 0.988 | 0.047 | 31% | 0.962 |
+
+*Recall(R) = recall on resistant cases (drug likely to fail); Recall(S) = recall
+on susceptible cases (drug likely to work), reported separately as required.
+No-call rate = fraction abstained; Called acc = accuracy on the non-abstained
+predictions. Full numbers in `results/pitch_metrics.csv`; per-drug reliability
+curves in `results/fig_calibration_real.png`.*
+
+**Generalization by genetic group** (rubric: "performance broken down by
+genetically related groups, groups not seen during training"): evaluated per
+held-out cgMLST cluster — see `results/fig_per_group.png` and
+`results/eval_grouped/per_group_metrics.csv`. Accuracy is near-perfect on most
+held-out lineages, with the honest outliers (e.g. one meropenem cluster) visible
+rather than averaged away.
 
 Balanced accuracy **0.94–0.98** with **Brier 0.02–0.05** — the reliability curves
 sit on the diagonal, so the confidences are real, not just high. For reference,
