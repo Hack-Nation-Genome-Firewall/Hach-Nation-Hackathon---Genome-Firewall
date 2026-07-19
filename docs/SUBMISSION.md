@@ -37,11 +37,6 @@ bloodstream infections and, in ICU cohorts with the most resistant strains,
 inappropriate, versus 9% when it was appropriate.** That gap — 77% versus 9% — is
 the entire problem, and it is exactly the decision Genome Firewall accelerates.
 
-*This problem is personal to our team: our domain lead chose* Klebsiella pneumoniae
-*because she lost a family member to a multidrug-resistant* Klebsiella *infection
-acquired in the ICU. Building the tool that could have given that clinician a fast,
-honest answer is why this project exists.*
-
 ## 2. Why existing tools aren't enough
 
 Genome-based AMR tools today (ResFinder, CARD, AMRFinderPlus, Pathogenwatch,
