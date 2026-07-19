@@ -190,8 +190,12 @@ demo-ready interface:
   `render_genome_report(row, gid)` function called *inside* each tab, so switching
   tabs is a pure client-side swap, the Upload tab stays blank (with an "upload a
   FASTA" prompt) until a genome is parsed, and an `on_change`-tracked `_active_source`
-  decides which genome the single floating assistant answers about. The model-level
-  held-out performance section stays rendered once, below the tabs.
+  decides which genome the single floating assistant answers about. The held-out
+  performance & calibration panel (interactive chart, metrics table, reliability
+  curves) is rendered inside `render_genome_report` too — with per-source widget keys
+  so the two tab copies never collide — so the Upload tab is fully empty until upload,
+  not just its verdict cards. Only the global human-oversight safety line stays below
+  the tabs, always visible.
 - **Real-mode held-out panel fix + F1 shown.** `EVAL_DIR` is now overridable via
   `GENOME_FIREWALL_EVAL` (defaulting to `eval/` as before), and `streamlit_app.py`
   points it at `results/eval_grouped/` for the deployed real run. Previously real mode

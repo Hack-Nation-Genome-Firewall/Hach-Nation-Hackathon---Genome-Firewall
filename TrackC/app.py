@@ -346,6 +346,41 @@ def render_genome_report(row: dict, gid: str, *, from_upload: bool = False) -> l
     st.markdown("".join(render_card(r) for r in recs), unsafe_allow_html=True)
     # Detailed AI report (grounded, one-shot) — download/print as PDF.
     render_report_section(recs, SPEC, gid, bundle)
+
+    # Held-out performance & calibration. Model-level, but rendered INSIDE each tab so
+    # the Upload tab stays completely empty until a genome is uploaded. Widget keys are
+    # namespaced per source so the demo and upload copies never collide in the DOM.
+    _kp = "up" if from_upload else "demo"
+    st.divider()
+    st.subheader("Held-out performance & calibration")
+    st.caption("Evaluated on a **homology-grouped** test split — near-identical genomes never "
+               "span train/test, so these numbers are not inflated by leakage.")
+    overall_path = EVAL_DIR / "overall_metrics.csv"
+    pred_path = EVAL_DIR / "held_out_predictions.csv"
+    if overall_path.exists():
+        odf = pd.read_csv(overall_path)
+        st.plotly_chart(performance_figure(odf), use_container_width=True,
+                        theme=None, config={"displayModeBar": False}, key=f"{_kp}_perf")
+        show = ["drug", "n", "balanced_accuracy", "recall_resistant", "recall_susceptible",
+                "f1", "auroc", "pr_auc", "brier", "no_call_rate"]
+        show = [c for c in show if c in odf.columns]
+        st.dataframe(
+            odf[show].rename(columns={
+                "balanced_accuracy": "bal_acc", "recall_resistant": "recall_R",
+                "recall_susceptible": "recall_S", "no_call_rate": "no_call"}),
+            use_container_width=True, hide_index=True, key=f"{_kp}_perftable",
+        )
+    else:
+        st.caption("Run `python -m module2_predictor.evaluate` to populate performance metrics.")
+    if pred_path.exists():
+        with st.expander("Calibration reliability — predicted vs. observed (interactive)", expanded=True):
+            st.caption("Perfect calibration follows the dotted diagonal. Hover any point for the "
+                       "predicted probability vs. the observed resistant fraction in that bin.")
+            pdf = pd.read_csv(pred_path)
+            st.plotly_chart(reliability_figure(pdf, SPEC["drugs"]), use_container_width=True,
+                            theme=None, config={"displayModeBar": False}, key=f"{_kp}_reliab")
+    else:
+        st.caption("Run `python -m module2_predictor.evaluate` to populate the reliability curves.")
     return recs
 
 
@@ -405,42 +440,9 @@ with tab_upload:
         st.info("⬆️ Upload an assembled genome (FASTA) above to generate its "
                 "antibiotic-response report here.")
 
-# ---------------------------------------------------------------------------
-# Held-out performance (interactive) + metrics table.  [model-level — always shown]
-# ---------------------------------------------------------------------------
-st.divider()
-st.subheader("Held-out performance & calibration")
-st.caption("Evaluated on a **homology-grouped** test split — near-identical genomes never "
-           "span train/test, so these numbers are not inflated by leakage.")
-
-overall_path = EVAL_DIR / "overall_metrics.csv"
-pred_path = EVAL_DIR / "held_out_predictions.csv"
-if overall_path.exists():
-    odf = pd.read_csv(overall_path)
-    st.plotly_chart(performance_figure(odf), use_container_width=True,
-                    theme=None, config={"displayModeBar": False})
-    show = ["drug", "n", "balanced_accuracy", "recall_resistant", "recall_susceptible",
-            "f1", "auroc", "pr_auc", "brier", "no_call_rate"]
-    show = [c for c in show if c in odf.columns]
-    st.dataframe(
-        odf[show].rename(columns={
-            "balanced_accuracy": "bal_acc", "recall_resistant": "recall_R",
-            "recall_susceptible": "recall_S", "no_call_rate": "no_call"}),
-        use_container_width=True, hide_index=True,
-    )
-else:
-    st.caption("Run `python -m module2_predictor.evaluate` to populate performance metrics.")
-
-if pred_path.exists():
-    with st.expander("Calibration reliability — predicted vs. observed (interactive)", expanded=True):
-        st.caption("Perfect calibration follows the dotted diagonal. Hover any point for the "
-                   "predicted probability vs. the observed resistant fraction in that bin.")
-        pdf = pd.read_csv(pred_path)
-        st.plotly_chart(reliability_figure(pdf, SPEC["drugs"]), use_container_width=True,
-                        theme=None, config={"displayModeBar": False})
-else:
-    st.caption("Run `python -m module2_predictor.evaluate` to populate the reliability curves.")
-
+# The held-out performance & calibration panel now renders INSIDE each tab (see
+# render_genome_report), so the Upload tab is fully blank until a genome is uploaded.
+# Only the global safety disclaimer stays below the tabs, always visible.
 st.divider()
 st.caption("Human oversight required: a trained healthcare or laboratory professional "
            "must confirm every result before any treatment decision.")
