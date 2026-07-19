@@ -192,6 +192,14 @@ demo-ready interface:
   FASTA" prompt) until a genome is parsed, and an `on_change`-tracked `_active_source`
   decides which genome the single floating assistant answers about. The model-level
   held-out performance section stays rendered once, below the tabs.
+- **Real-mode held-out panel fix + F1 shown.** `EVAL_DIR` is now overridable via
+  `GENOME_FIREWALL_EVAL` (defaulting to `eval/` as before), and `streamlit_app.py`
+  points it at `results/eval_grouped/` for the deployed real run. Previously real mode
+  set only the four `GENOME_FIREWALL_*` artifact vars, so the interactive performance
+  chart, metrics table, and calibration curves silently fell back to the "run
+  evaluate" placeholder because the local `eval/` dir is empty. The held-out metrics
+  table now also surfaces the per-drug **F1** (resistant class at the 0.5 threshold),
+  which was already computed and written to `overall_metrics.csv` but not displayed.
 - **Figures ported to the real contract.** `TrackC/make_figures.py` now reads
   `data/synthetic/*` + the joblib bundle (was still on the old
   `data/manifests/feature_spec.json` layout) and regenerates the static

@@ -39,7 +39,7 @@ SPEC_PATH = Path(os.environ.get("GENOME_FIREWALL_SPEC", HERE / "data/synthetic/f
 FEATURES_PATH = Path(os.environ.get("GENOME_FIREWALL_FEATURES", HERE / "data/synthetic/features.csv"))
 SPLITS_PATH = Path(os.environ.get("GENOME_FIREWALL_SPLITS", HERE / "data/synthetic/split_manifest.csv"))
 BUNDLE_PATH = Path(os.environ.get("GENOME_FIREWALL_BUNDLE", HERE / "models/synthetic_bundle.joblib"))
-EVAL_DIR = HERE / "eval"
+EVAL_DIR = Path(os.environ.get("GENOME_FIREWALL_EVAL", HERE / "eval"))
 SPEC = load_feature_spec(SPEC_PATH)
 IS_SYNTHETIC = bool(SPEC.get("synthetic"))
 
@@ -420,7 +420,7 @@ if overall_path.exists():
     st.plotly_chart(performance_figure(odf), use_container_width=True,
                     theme=None, config={"displayModeBar": False})
     show = ["drug", "n", "balanced_accuracy", "recall_resistant", "recall_susceptible",
-            "auroc", "pr_auc", "brier", "no_call_rate"]
+            "f1", "auroc", "pr_auc", "brier", "no_call_rate"]
     show = [c for c in show if c in odf.columns]
     st.dataframe(
         odf[show].rename(columns={

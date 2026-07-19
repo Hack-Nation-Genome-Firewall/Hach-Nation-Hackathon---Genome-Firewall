@@ -17,6 +17,10 @@ os.environ.setdefault("GENOME_FIREWALL_SPEC", str(ROOT / "data/manifests/feature
 os.environ.setdefault("GENOME_FIREWALL_FEATURES", str(ROOT / "data/manifests/features.csv"))
 os.environ.setdefault("GENOME_FIREWALL_SPLITS", str(ROOT / "data/manifests/split_manifest_aligned.csv"))
 os.environ.setdefault("GENOME_FIREWALL_BUNDLE", str(ROOT / "models/kp_real_grouped.joblib"))
+# Point the held-out performance/calibration panel at the REAL grouped eval outputs
+# (the local `eval/` dir is empty in real mode, which is why the interactive chart +
+# metrics table were falling back to the "run evaluate" placeholder).
+os.environ.setdefault("GENOME_FIREWALL_EVAL", str(ROOT / "results/eval_grouped"))
 
 # Make repo packages (module1_reader, module2_predictor, TrackC) importable.
 import sys
