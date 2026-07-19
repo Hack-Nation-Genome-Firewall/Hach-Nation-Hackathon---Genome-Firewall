@@ -1,0 +1,9 @@
+drug,split,n,balanced_accuracy,recall_resistant,recall_susceptible,auroc,pr_auc,brier,no_call_rate,called_balanced_accuracy
+meropenem,grouped,536,0.937,0.913,0.961,0.97,0.936,0.042,0.741,0.714
+ciprofloxacin,grouped,533,0.978,0.982,0.975,0.995,0.997,0.02,0.364,0.821
+gentamicin,grouped,538,0.935,0.88,0.989,0.967,0.957,0.041,0.375,0.976
+ceftazidime,grouped,530,0.935,0.948,0.922,0.976,0.988,0.047,0.311,0.728
+meropenem,temporal,808,0.779,0.559,1.0,0.986,0.966,0.062,0.845,1.0
+ciprofloxacin,temporal,773,0.935,0.974,0.897,0.985,0.984,0.05,0.534,0.651
+gentamicin,temporal,811,0.903,0.824,0.983,0.968,0.941,0.065,0.38,0.98
+ceftazidime,temporal,792,0.914,0.912,0.917,0.966,0.968,0.068,0.524,0.784
