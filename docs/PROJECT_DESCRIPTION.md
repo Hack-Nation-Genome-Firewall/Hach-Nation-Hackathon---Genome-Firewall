@@ -104,18 +104,33 @@ provide together:
   `scripts/make_pitch_results.py`).
 
 ## 6. Results & Impact
-*(Filled from `results/pitch_metrics.csv` — real held-out numbers.)*
+*Real held-out numbers from `results/pitch_metrics.csv` — 2,997 K. pneumoniae
+genomes (BV-BRC, laboratory-measured labels only), AMRFinderPlus features.*
 
-- **Held-out performance** (homology-grouped split), per drug:
-  balanced accuracy ⟦⟧, recall(R) ⟦⟧, recall(S) ⟦⟧, AUROC ⟦⟧, Brier ⟦⟧,
-  no-call rate ⟦⟧.
-- **Calibration:** reliability curves show predicted ≈ observed (Brier ⟦⟧),
-  i.e. the confidences are trustworthy, not just high.
-- **Temporal generalization:** trained on pre-2015 isolates, evaluated on
-  2015–2018 — balanced accuracy ⟦⟧, demonstrating the model holds as resistance
-  drifts (a test most tools never run).
-- **Safety behavior:** ⟦⟧% of genomes correctly routed to `no_call` rather than
-  a confident error; every susceptible case yields a narrowest-spectrum
+**Held-out performance — homology-grouped split** (whole cgMLST clusters held
+out; the model cannot memorize a lineage):
+
+| Drug | Balanced acc | Recall(R) | Recall(S) | AUROC | Brier | No-call rate |
+|---|---|---|---|---|---|---|
+| ciprofloxacin | **0.978** | 0.98 | 0.97 | 0.995 | 0.020 | 36% |
+| meropenem | **0.937** | 0.91 | 0.96 | 0.970 | 0.042 | 74% |
+| gentamicin | **0.935** | 0.88 | 0.99 | 0.967 | 0.041 | 38% |
+| ceftazidime | **0.935** | 0.95 | 0.92 | 0.976 | 0.047 | 31% |
+
+- **Calibration:** reliability curves hug the diagonal (Brier 0.02–0.05) — the
+  confidences are trustworthy, not just high. Rule-based incumbents report
+  balanced accuracy 0.52–0.66 on clinical isolates with no probability at all.
+- **Temporal generalization:** trained on pre-2015 isolates, tested on
+  2015–2018 despite a real ~21-point resistance drift in the ESBL drugs —
+  balanced accuracy holds at ciprofloxacin 0.94, ceftazidime 0.91, gentamicin
+  0.90; meropenem drops to 0.78 (honest degradation, see below). A test most
+  tools never run.
+- **Safety behavior under shift:** out-of-distribution abstentions rise from
+  ~5 genomes per drug on the grouped split to 71–90 per drug on the temporal
+  split — the firewall *detects* that future isolates look less familiar and
+  abstains more, rather than guessing. Meropenem's temporal drop is absorbed by
+  a rising no-call rate (recall(S)=1.00 on the calls it does make), not by
+  confident errors. Every susceptible case yields a narrowest-spectrum
   stewardship recommendation.
 
 **Impact:** genome-to-decision in seconds instead of 24–72 h of culture, with
