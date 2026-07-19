@@ -25,7 +25,7 @@ R-rate, pre-2015 vs 2015–2018:
 | drug | past R-rate | future R-rate | drift |
 |---|---|---|---|
 | ceftazidime | 0.75 | 0.54 | **−21 pts** |
-| ciprofloxacin | 0.71 | 0.50 | **−22 pts** |
+| ciprofloxacin | 0.71 | 0.50 | **−21 pts** |
 | meropenem | 0.28 | 0.23 | −5 pts |
 | gentamicin | 0.35 | 0.34 | −1 pt |
 
@@ -95,6 +95,11 @@ resistance this tool detects, so the recommendation logic is on-message with the
 - **De-novo target / sequence generation** — this is a defensive firewall; the
   rubric rewards calibrated abstention, not speculative generation. The
   on-theme version of "help beyond detection" is the stewardship layer above.
-- **Multi-tool feature merging** — the K. pneumoniae benchmark shows combining
-  annotators *lowers* ML performance; one well-curated tool is the correct choice
-  (see the annotator note in the data discussion).
+- **Multi-tool feature merging** — a published K. pneumoniae annotator benchmark
+  cited in the team's data review (Sci Rep 2025, PMC12627748) reports that
+  combining tools *lowers* downstream ML performance ("fewer, well-curated
+  features → better model"). We did not re-run that comparison ourselves; the
+  design choice (one well-curated annotator, not a merged pile) follows that
+  external finding plus our own observation that BV-BRC's stored `sp_gene` /
+  `genome_feature` annotations lack clean allele symbols. Worth validating on our
+  own cohort before treating it as settled.
