@@ -121,9 +121,11 @@ provably contract-valid.
 - **Mash clustering** (step 1 above): needs Mash + the genome FASTAs (not in the repo).
   Until then, feed precomputed clusters. The threshold is an expert-approved knob.
 - **Target-presence flags** (`target__<gene>`): AMRFinderPlus reports resistance
-  markers, not whether a drug's *target* gene is present/intact. These default to
-  present (1) until a real gene-presence check (e.g. BLAST the target gene vs the
-  assembly) is wired into `AMRFinderPlusAnnotator.annotate()`.
+  markers, not whether a drug's *target* gene is present/intact. Until a real
+  gene-presence check (e.g. BLAST the target gene vs the assembly) is wired into
+  `AMRFinderPlusAnnotator.annotate()`, these are left **unknown (None)**, so Track B
+  routes them to no-call — never faked "present" (guardrail: missing target
+  information must not read as present).
 - **`ompK36_loss`** is a derived *absence* feature, not a direct AMRFinderPlus hit.
 - **QC columns** (`qc_completeness`, `qc_contamination`, `qc_contigs`): *done* — read
   straight from `data/manifests/selected_genomes.csv` (CheckM completeness/contamination

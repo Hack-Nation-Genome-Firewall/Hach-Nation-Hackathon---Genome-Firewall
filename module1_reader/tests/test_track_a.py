@@ -45,7 +45,7 @@ def test_run_genome_reader_returns_contract_in_order(spec):
 def test_flags_are_binary_ints(spec):
     row = run_genome_reader(genome_id="G1", backend="amrfinderplus",
                             spec=spec, tsv_override=FIXTURE_TSV)
-    for col in marker_columns(spec) + target_columns(spec):
+    for col in marker_columns(spec):  # markers are strict 0/1; targets may be None (unknown)
         assert row[col] in (0, 1)
         assert isinstance(row[col], int)
 
@@ -114,11 +114,14 @@ def test_batch_writes_unknown_markers_sidecar(tmp_path, spec):
     assert "G1,blaFOO-999" in text
 
 
-def test_targets_default_present(spec):
+def test_targets_default_unknown(spec):
+    # Guardrail: never treat missing target info as present. Until real target
+    # detection is wired, targets are UNKNOWN (None) -> Track B no-call. run_genome_
+    # reader returns a *validated* row, so this also confirms the gate accepts None.
     row = run_genome_reader(genome_id="G1", backend="amrfinderplus",
                             spec=spec, tsv_override=FIXTURE_TSV)
     for col in target_columns(spec):
-        assert row[col] == 1  # present-until-proven-absent default (documented TODO)
+        assert row[col] is None
 
 
 # --------------------------------------------------------------------------- #

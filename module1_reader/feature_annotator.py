@@ -162,21 +162,44 @@ def validate_feature_row(row: dict, spec: dict) -> dict:
     """
     The validation gate. Every annotator's output passes through here.
 
-    Guarantees the row has exactly the contract's columns, in a form Track B can
-    consume: all model_features + target + QC columns present, binary flags coerced
-    to 0/1 ints, QC coerced to the right numeric types. Fails LOUDLY on anything
-    missing or non-binary so a broken backend can never silently corrupt features.
+    Guarantees the row has exactly the contract's columns in a form Track B can
+    consume: model_features are required and binary; target + QC columns are binary/
+    numeric WHEN KNOWN but may be explicitly unknown (None), which Track B routes to
+    no-call rather than treating missing evidence as a pass. Fails LOUDLY on missing
+    columns or invalid measured values so a broken backend can't corrupt features.
     """
     out: dict = {}
     missing, nonbinary = [], []
 
-    # model_features + target columns are all binary flags
-    for col in marker_columns(spec) + target_columns(spec):
+    # Model features are always required and binary.
+    for col in marker_columns(spec):
         if col not in row:
             missing.append(col)
             continue
         v = row[col]
         if v in (0, 1, "0", "1", True, False):
+            out[col] = int(v)
+        else:
+            try:
+                iv = int(v)
+                if iv in (0, 1):
+                    out[col] = iv
+                else:
+                    nonbinary.append((col, v))
+            except (TypeError, ValueError):
+                nonbinary.append((col, v))
+
+    # Target-status columns are binary WHEN KNOWN but may be unknown (None/blank).
+    # Unknown is valid — Track B's target_status_unknown gate routes it to no-call.
+    # Guardrail: never treat missing target information as target present.
+    for col in target_columns(spec):
+        if col not in row:
+            missing.append(col)
+            continue
+        v = row[col]
+        if v is None or v == "":
+            out[col] = None
+        elif v in (0, 1, "0", "1", True, False):
             out[col] = int(v)
         else:
             try:
@@ -245,10 +268,13 @@ class FeatureAnnotator(ABC):
         return validate_feature_row(self.annotate(genome_id, source), self.spec)
 
     def _empty_row(self) -> dict:
-        """All markers absent, targets present, QC unknown — the base each backend fills in."""
+        """All markers absent, target status + QC unknown — the base each backend fills in."""
         row = {c: 0 for c in marker_columns(self.spec)}
         for c in target_columns(self.spec):
-            row[c] = 1  # targets assumed present until evidence of loss (see AMRFinderPlus backend)
+            # Target presence UNKNOWN until real detection is wired — never fake
+            # "present" (guardrail: never treat missing target info as present).
+            # Track B's target_status_unknown gate routes this to no-call.
+            row[c] = None
         # QC unknown until _fill_qc supplies it — NOT faked clean (guardrail: a
         # missing QC value must read as no-call, never as a good assembly).
         for c in quality_columns(self.spec):
@@ -330,9 +356,10 @@ class AMRFinderPlusAnnotator(FeatureAnnotator):
     NOTE (honest limitation): AMRFinderPlus reports resistance markers, not the
     presence/intactness of a drug's *target* housekeeping gene. Target-presence
     detection (the `target__<gene>` flags) needs a separate gene-presence check
-    against the assembly; until that is wired in, targets default to present (1).
-    ompK36_loss is likewise a derived "absence" feature, not a direct AMRFinderPlus
-    hit. Both are flagged TODO below rather than faked. Markers AMRFinderPlus reports
+    against the assembly; until that is wired in, targets are left UNKNOWN (None)
+    so Track B routes them to no-call — never faked "present" (guardrail: missing
+    target information must not read as present). ompK36_loss is likewise a derived
+    "absence" feature, not a direct AMRFinderPlus hit. Markers AMRFinderPlus reports
     that are outside the vocabulary are recorded in `last_unknown_markers`, not dropped.
     """
 
