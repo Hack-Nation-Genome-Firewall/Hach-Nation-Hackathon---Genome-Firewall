@@ -1,6 +1,7 @@
 # Genome Firewall: Team Status and Next Steps
 
-**Status snapshot:** 19 July 2026 (Track C — FASTA upload wired to Track A reader)
+**Status snapshot:** 19 July 2026 (Track C — FASTA upload wired to Track A reader;
+grounded AI report assistant added)
 
 **Repository:** https://github.com/liiandy/Hach-Nation-Hackathon---Genome-Firewall
 
@@ -183,18 +184,51 @@ demo-ready interface:
   `data/synthetic/*` + the joblib bundle (was still on the old
   `data/manifests/feature_spec.json` layout) and regenerates the static
   `eval/fig_reliability.png` / `eval/fig_leakage.png` artifacts.
+- **Grounded AI "Report Assistant" (optional, OpenAI-backed).** A floating chat
+  bubble in the bottom-right of the report opens a panel that explains *the report
+  currently on screen* in plain language, so a non-specialist can ask "why is
+  meropenem a no-call?" instead of decoding the jargon. It is **grounded** — every
+  answer is built from the on-screen per-drug records, coverage spec, held-out
+  metrics, and the provenance docs; it is told to say "I don't have that on this
+  page" outside that scope and never to invent numbers, markers, or verdicts. It is
+  **guarded** in line with our safety framing: the system prompt forbids clinical /
+  treatment / dosing advice and redirects to laboratory confirmation plus a
+  clinician, refuses dual-use requests to increase or engineer resistance, discloses
+  synthetic mode, and resists prompt-injection. Quick-question chips are generated
+  from the live report, and once a conversation starts they collapse so the
+  transcript keeps the space. The LLM call sits behind one function
+  (`_stream_completion`) so the model/provider is swappable; it uses `gpt-4o-mini`
+  and streams. The feature is **optional and degrades gracefully** — with no key it
+  shows a hint and the rest of the app is unaffected. Each developer supplies their
+  **own** OpenAI key, which lives only in a gitignored `.streamlit/secrets.toml` and
+  is never committed. File: `TrackC/chat_assistant.py`.
+- **Stability fix — pinned `pyarrow==18.1.0`.** pyarrow 25.x segfaults (SIGSEGV)
+  when Streamlit re-serializes the held-out metrics table on a rerun (macOS/arm64),
+  which crashed the whole app on the first interaction (not just the assistant).
+  Pinned to 18.1.0 in `requirements.txt`; do not bump without re-testing reruns.
 
-Files: `TrackC/app.py`, `TrackC/charts.py` (new), `TrackC/make_figures.py`,
-`.streamlit/config.toml` (new). Runtime deps added: `streamlit`, `plotly`,
-`matplotlib` (Python 3.11).
+Files: `TrackC/app.py`, `TrackC/charts.py`, `TrackC/make_figures.py`,
+`TrackC/chat_assistant.py` (new), `TrackC/assets/`, `.streamlit/config.toml`,
+`.streamlit/secrets.toml.example` (new). Runtime deps added: `streamlit`, `plotly`,
+`matplotlib`, `openai`, `pyarrow==18.1.0` (Python 3.11+; verified on 3.12).
 
 Run it:
 
 ```bash
 python -m module2_predictor.train        # produces models/synthetic_bundle.joblib
 python -m module2_predictor.evaluate     # produces eval/*.csv consumed by the app
+
+# Optional — enable the AI Report Assistant with YOUR OWN OpenAI key:
+cp .streamlit/secrets.toml.example .streamlit/secrets.toml
+# then edit .streamlit/secrets.toml and paste your key into OPENAI_API_KEY
+
 streamlit run TrackC/app.py
 ```
+
+The assistant is optional: skip the two `secrets.toml` lines and the app still
+runs — only the chat panel is disabled. **Do not commit `.streamlit/secrets.toml`**
+(it is gitignored); each teammate uses their own key so we never share or burn a
+single shared OpenAI credit.
 
 Automated status:
 
