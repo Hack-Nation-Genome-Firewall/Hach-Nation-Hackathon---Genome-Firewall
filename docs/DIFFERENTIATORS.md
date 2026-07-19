@@ -35,7 +35,7 @@ temporal-split numbers alongside the grouped-split numbers is an honesty signal:
 it shows the real-world generalisation gap instead of concealing it.
 
 ### Honest caveat (documented, not hidden)
-This is a **pure temporal** cut. 129/813 test genomes (15%) share a cgMLST HC10
+This is a **pure temporal** cut. 129/813 test genomes (16%) share a cgMLST HC10
 cluster with a pre-2015 isolate, so it is not simultaneously a strict homology
 split. Two legitimate framings, both reported:
 - *temporal* generalisation: this split (train on the past, test on the future);
