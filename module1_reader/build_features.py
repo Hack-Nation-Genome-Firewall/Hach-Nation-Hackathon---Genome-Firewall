@@ -137,10 +137,12 @@ def _main() -> None:
 
     present = [c for c in marker_columns(spec) if row.get(c) == 1]
     tgt_absent = [c for c in target_columns(spec) if row.get(c) == 0]
+    tgt_unknown = [c for c in target_columns(spec) if row.get(c) is None]
     qf = spec["quality_features"]
     print(f"genome_id: {args.genome_id}  (backend={args.backend})")
     print(f"markers present ({len(present)}): {present}")
     print(f"targets absent/disrupted: {tgt_absent or 'none'}")
+    print(f"targets unknown (-> no-call): {tgt_unknown or 'none'}")
     print(f"QC: completeness={row.get(qf['completeness'])} "
           f"contamination={row.get(qf['contamination'])} contigs={row.get(qf['contigs'])}")
     print(f"unknown markers (preserved, not in vocab): {unknown or 'none'}")
